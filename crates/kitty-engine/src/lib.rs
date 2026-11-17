@@ -1,4 +1,4 @@
-//! Patch engine for M0on's packer & patcher.
+//! Patch engine of m0onpatcher.
 //!
 //! A Rust reimplementation of the behaviour of the m0on KittyPatcher 0.7.6 v2
 //! (`kittypatcher dev\M0on-Kittypatcher v0.7.6 v2\`). Milestone M1 covers the

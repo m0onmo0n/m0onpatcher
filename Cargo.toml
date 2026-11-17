@@ -1,17 +1,17 @@
 [package]
-name = "m0on-packer"
+name = "m0onpatcher"
 version = "0.1.0"
 edition = "2024"
+description = "Standalone mod patcher for Course of Temptation (SugarCube / Twine): applies .mod files to a game HTML with the built-in Rust engine."
 
 [package.metadata.bundle]
-name = "M0on's packer & patcher"
-identifier = "me.proton.nuqqur.screpacker"
+name = "M0on's patcher"
+identifier = "tech.moonmoon.m0onpatcher"
 category = "public.app-category.utilities"
-short_description = "Twine/SugarCube HTML mod packer"
+short_description = "Mod patcher for Twine/SugarCube HTML games"
 long_description = """
-M0on's packer & patcher (a fork of nuqqur's ScRepacker) extracts Twine/SugarCube HTML games into editable source \
-trees, applies .diff / .mod / KittyPatcher patches, and repacks the \
-result back into a playable HTML file.
+M0on's patcher applies .mod files (KittyPatcher format) to a Twine/SugarCube game HTML \
+with a built-in Rust engine. No Python and no separate KittyPatcher are needed.
 """
 
 [workspace]
@@ -19,23 +19,18 @@ members = ["xtask", "crates/kitty-engine"]
 
 [dependencies]
 kitty-engine = { path = "crates/kitty-engine" }
-tl = "0.7"
-regex = "1"
 anyhow = "1"
-sha1 = "0.10"
 log = "0.4"
-simplelog = "0.12"
-flickzeug = "0.5"
-diffy-imara = "0.3"
+regex = "1"
+sha1 = "0.10"
+tl = "0.7"
+image = { version = "0.25", default-features = false, features = ["png"] }
 eframe = { version = "0.34", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 rfd = "0.17"
-# Match eframe 0.34's transitive winit — we need direct access to force the
-# X11 backend since winit's Wayland side has no drag-and-drop support.
+# Match eframe 0.34's transitive winit: needed to force the X11 backend on Linux (winit's Wayland side has no drag-and-drop).
 winit = "0.30"
-notify = "8"
-tungstenite = "0.29"
-indexmap = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-time = { version = "0.3", default-features = false, features = ["formatting", "macros"] }
-zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"

@@ -1,19 +1,25 @@
-M0on's packer & patcher: copyright and credits
+M0on's patcher: copyright and credits
 
-Original parts of this fork (the kitty-engine crate, its integration, the engine selector,
-the About tab and related changes): Copyright (c) 2026 m0on. All rights reserved.
+Original parts (the kitty-engine crate and the patcher program around it):
+Copyright (c) 2026 m0on. All rights reserved.
 No licence is granted to copy, modify or redistribute this program.
 
 This program is built on the work of others. None of the following projects carries a
 licence, so their authors keep all rights in their work and no licence for it is granted
 or implied here:
 
-  - ScRepacker (screpacker-rs) by nuqqur, https://gitgud.io/nuqqur/screpacker-rs/ :
-    the extractor, packer, .diff handling and interface this program is built on.
   - KittyPatcher by LK / kitty (original creator of KittyPatcher, 0.1.5c and 0.2.0a), and
     KittyPatcher v0.4.0, v0.6.0, the v0.7.x versions and the KittyPatcher ecosystem by
     CoderMaverick: the behaviour the built-in kitty-engine reimplements.
+  - ScRepacker (screpacker-rs) by nuqqur, https://gitgud.io/nuqqur/screpacker-rs/ : the
+    extractor and merger behind the Modding tools tab, and the look of the window and its
+    log box, are taken from ScRepacker.
   - The Course of Temptation modding community.
+
+The program icon (assets/shield-moon.svg, and the PNG and ICO made from it) is the
+"shield-moon" icon from Material Design Icons by Pictogrammers,
+https://pictogrammers.com/library/mdi/icon/shield-moon/ , used under the Apache License 2.0
+(https://www.apache.org/licenses/LICENSE-2.0); the colour was changed.
 
 Credit is not a licence. If the authors above grant permission or publish a licence, this
 notice will be updated.

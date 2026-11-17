@@ -28,8 +28,6 @@ debug/
 /other
 /.claude
 /demo
-/screpacker-logs
-/screpacker-config.json
 /versions
 
 # Python helper scripts
@@ -37,3 +35,6 @@ __pycache__/
 
 # Working notes, not published
 /docs/engine-design.md
+
+# Local settings of the program
+/m0onpatcher-config.json

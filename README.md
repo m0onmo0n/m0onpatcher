@@ -1,28 +1,39 @@
-# M0on's packer & patcher
+# m0onpatcher
 
-A packer and mod patcher for **Course of Temptation** (SugarCube / Twine). It is a fusion of
-**ScRepacker v0.1.5** (extract the game HTML into editable sources, apply `.diff` mods, repack) and the
-**m0on-kittypatcher v0.7.6 fork** (apply `.mod` files), rewritten in Rust as a built-in engine. One program
-handles both mod formats; no Python and no separate KittyPatcher are needed.
+A small standalone program that applies `.mod` files (KittyPatcher format) to a **Course of Temptation**
+(SugarCube / Twine) game HTML. Its patch engine, the `kitty-engine` crate, is a Rust reimplementation of the
+**m0on-kittypatcher v0.7.6 fork**, with a plain window around it. No Python and no separate KittyPatcher are needed.
+
+**m0onpacker** is the sibling project: a fork of ScRepacker (extract, `.diff` mods, repack) with this engine built in.
+It uses the `kitty-engine` crate from this repository.
 
 ## Using it
 
-1. Start `m0on-packer` (Windows `.exe`, Linux binary or macOS app).
-2. Open the game HTML (drag it onto the window, or pick it on the *Modding* tab). Put your mods in a `mods` folder next to it.
-3. Press **Patch**. The result is `<game>.modded.html` next to the original.
+Start `m0onpatcher` (Windows `.exe` or Linux binary). It has three tabs.
 
-On a full 189-mod pack the patch step takes a few seconds.
+### Patcher
 
-### Patch engine (Config tab)
+1. Choose the game HTML and the folder with the `.mod` files, or drag them onto the window. A `mods` folder next to the HTML is picked automatically.
+2. Press **Patch**. The result is `<game>.modded.html` next to the original (use *Save as* to pick another name).
 
-| Setting | What it does |
-|---|---|
-| **Internal engine** (default) | The built-in engine only. KittyPatcher is never called. |
-| **Internal engine, KittyPatcher as fallback** | Built-in engine first; an external KittyPatcher is used only for a mod set the built-in engine cannot handle yet. |
-| **External KittyPatcher** | The original ScRepacker behaviour: run a KittyPatcher `.py` / `.exe` that you point it to. |
+If any block fails, nothing is written. Like KittyPatcher on Windows, the output file uses Windows line endings.
+The three KittyPatcher-style logs (`FailsPatchLog.txt`, `MainPatchLog.txt`, `ModPatchLog.txt`) are written to
+`<game folder>\logs`.
 
-The setting is the `engine` key of `screpacker-config.json` (`builtin`, `auto`, `external`). The config and log
-file names (`screpacker-config.json`, `screpacker-logs\`) are unchanged from ScRepacker.
+### Modding tools
+
+* **Extract source** writes the editable sources of the game HTML (passages as `.twee`, scripts, styles) to a `src` folder next to it. If `src` already exists you are asked first, because extracting again replaces its files.
+* **Compile HTML** builds `<game>.merged.html` from `src` again, using the game HTML as the reference.
+* **Open source folder** opens `src` in the file manager.
+
+The extractor and the compiler are ScRepacker's.
+
+### About
+
+What the program is, the copyright notice and the credits.
+
+**Show log** (on the Patcher and Modding tools tabs) switches between the log window (the same scrolling log as the
+packer) and a plain progress bar. The program remembers its settings in `m0onpatcher-config.json` next to the exe.
 
 ### Mod load order
 
@@ -78,30 +89,28 @@ same way but have not been compared run by run.
 | `.json` dependency files, `[load_order]` | Alphabetical order only. |
 | Encrypted (KittyEncode) mod files | Not read. |
 
-When a mod set uses something the engine does not support, it stops with a message naming the directive (or,
-with *KittyPatcher as fallback*, hands the pack to the external patcher).
+When a mod set uses something the engine does not support, it stops with a message naming the directive.
 
 ## Building
 
 Rust 1.85 or newer (edition 2024).
 
 ```
-cargo build --release -p m0on-packer      # the program
+cargo build --release -p m0onpatcher      # the program
 cargo test  -p kitty-engine               # engine tests
 cargo dist                                # zip for this platform in target/dist/
 ```
 
-The patch engine is the `crates/kitty-engine` crate; its design notes are in `docs/engine-design.md`.
-It compiles for Windows, Linux and macOS (checked with `cargo check`; Linux needs the usual X11/Wayland
-development libraries for the GUI).
+The patch engine is the `crates/kitty-engine` crate; m0onpacker depends on it. It compiles for Windows, Linux
+and macOS (checked with `cargo check`; Linux needs the usual X11/Wayland development libraries for the GUI).
 
 ## Credits and copyright
 
-Original parts of this fork: Copyright (c) 2026 m0on. All rights reserved. ScRepacker and KittyPatcher are
-published without a licence; their authors keep all rights in their work, and no licence for it is granted here.
-See `NOTICE.txt`.
+Original parts: Copyright (c) 2026 m0on. All rights reserved. ScRepacker and KittyPatcher are published without
+a licence; their authors keep all rights in their work, and no licence for it is granted here. See `NOTICE.txt`.
 
-* **nuqqur**: ScRepacker (https://gitgud.io/nuqqur/screpacker-rs/), the extractor, packer and interface this program is built on
 * **LK / kitty**: original creator of KittyPatcher (0.1.5c and 0.2.0a)
 * **CoderMaverick**: author of KittyPatcher v0.4.0, v0.6.0 and the v0.7.x versions, and of the KittyPatcher ecosystem
+* **nuqqur**: ScRepacker (https://gitgud.io/nuqqur/screpacker-rs/), the source of the extractor, the merger and the window design
+* **Pictogrammers**: the "shield-moon" icon from Material Design Icons (Apache 2.0)
 * The Course of Temptation modding community
