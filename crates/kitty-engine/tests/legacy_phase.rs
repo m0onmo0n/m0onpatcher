@@ -164,3 +164,22 @@ fn an_unknown_header_value_is_ignored_with_a_warning() {
     assert!(loaded.warnings.iter().any(|w| w.contains("unknown value 'yes'")), "{:?}", loaded.warnings);
     assert!(loaded.state.legacy_list.is_empty());
 }
+
+// ---- ordered groups (stage builder) ---------------------------------------------------------------------
+
+#[test]
+fn groups_load_in_the_given_order_not_alphabetically() {
+    use kitty_engine::load::load_mod_groups;
+    let dir = mods_dir("groups", &[("a.mod", "cat\n~\nA\n~~\n"), ("b.mod", "dog\n~\nB\n~~\n"), ("c.mod", "# Priority: 1\ncat dog\n~\nC\n~~\n")]);
+    let p = |n: &str| dir.join(n);
+    // given order: b, a  (alphabetical would be a, b)
+    let loaded = load_mod_groups(&[vec![p("b.mod")], vec![p("a.mod")]], &LoadOptions::default()).unwrap();
+    assert_eq!(loaded.loaded_mods, vec!["b.mod".to_string(), "a.mod".to_string()]);
+    // inside one group the usual order applies: priority 1 (c) before default 1000 (a, b)
+    let loaded = load_mod_groups(&[vec![p("b.mod"), p("a.mod"), p("c.mod")]], &LoadOptions::default()).unwrap();
+    assert_eq!(loaded.loaded_mods, vec!["c.mod".to_string(), "a.mod".to_string(), "b.mod".to_string()]);
+    // the same file in two groups loads once
+    let loaded = load_mod_groups(&[vec![p("a.mod")], vec![p("a.mod"), p("b.mod")]], &LoadOptions::default()).unwrap();
+    assert_eq!(loaded.loaded_mods, vec!["a.mod".to_string(), "b.mod".to_string()]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

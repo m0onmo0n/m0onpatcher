@@ -2,6 +2,10 @@
 //! to the HTML, write the result. `--crlf` writes Windows line endings, like the Python patcher does on
 //! Windows (used to compare with its raw output). `--legacy-all` turns on the legacy phase: the old
 //! `~` / `~~` blocks run first and replace every match.
+//!
+//! Environment: `KITTY_PROGRESS=1` prints the engine's stage messages with timestamps to stderr;
+//! `KITTY_LOG=<file>` writes the full patch log and the failure list to that file.
+//! Exit code: 0 = all blocks applied, 1 = a block failed or an error (the message is printed), 2 = wrong usage.
 
 use std::path::Path;
 
@@ -34,14 +38,9 @@ fn main() -> anyhow::Result<()> {
     std::fs::write(&args[2], text)?;
     if let Ok(path) = std::env::var("KITTY_LOG") {
         // full patch log and failure log, for debugging
-        let mut s = out.log.join("
-");
-        s.push_str("
-=== FAILURES ===
-");
-        s.push_str(&out.fail_log.join("
-=====
-"));
+        let mut s = out.log.join("\n");
+        s.push_str("\n=== FAILURES ===\n");
+        s.push_str(&out.fail_log.join("\n=====\n"));
         std::fs::write(path, s)?;
     }
     println!(
@@ -50,6 +49,10 @@ fn main() -> anyhow::Result<()> {
     );
     for l in &out.fail_log {
         println!("FAIL: {}", l.chars().take(200).collect::<String>());
+    }
+    if out.replacements_failed > 0 || !out.fail_log.is_empty() {
+        // the output file is still written (handy for comparing runs), but scripts can tell something failed
+        std::process::exit(1);
     }
     Ok(())
 }

@@ -162,24 +162,44 @@ pub fn load_mod_files(files: &[PathBuf]) -> Result<LoadResult> {
 
 /// [`load_mod_files`] with options.
 pub fn load_mod_files_with(files: &[PathBuf], opts: &LoadOptions) -> Result<LoadResult> {
+    load_mod_groups(&[files.to_vec()], opts)
+}
+
+/// All files under a mods folder, in the order [`load_mods`] reads them (sub-folders first, `logs` skipped).
+/// Use it to turn a folder into one group for [`load_mod_groups`].
+pub fn mod_files_in(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    collect_files(dir, &mut files)?;
+    Ok(files)
+}
+
+/// Load mods that come in ordered groups (a folder, or one picked file, per group). The groups load in the order
+/// given; inside a group the usual order applies (`# Priority:` header, then file name). One run, one set of
+/// registries: the mods of all groups can see each other's changes. A file name that appears in two groups is
+/// loaded once (the first one wins).
+pub fn load_mod_groups(groups: &[Vec<PathBuf>], opts: &LoadOptions) -> Result<LoadResult> {
     let mut warnings = Vec::new();
 
     // stem -> path (first one wins), like `all_files`
     let mut all: Vec<(String, PathBuf)> = Vec::new();
+    let mut group_of: HashMap<String, usize> = HashMap::new();
     let mut seen: HashMap<String, usize> = HashMap::new();
-    for f in files {
-        let fname = f.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if VALID_MOD_EXTS.iter().any(|ext| fname.ends_with(ext)) {
-            let s = stem(fname);
-            if !seen.contains_key(&s) {
-                seen.insert(s.clone(), all.len());
-                all.push((s, f.clone()));
+    for (gi, files) in groups.iter().enumerate() {
+        for f in files {
+            let fname = f.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if VALID_MOD_EXTS.iter().any(|ext| fname.ends_with(ext)) {
+                let s = stem(fname);
+                if !seen.contains_key(&s) {
+                    seen.insert(s.clone(), all.len());
+                    group_of.insert(s.clone(), gi);
+                    all.push((s, f.clone()));
+                }
             }
-        }
-        if fname.to_lowercase().ends_with(".json") {
-            warnings.push(format!(
-                "{fname}: dependency sidecars / cm_dependencies.json are not supported by the builtin engine yet; load order may differ from the Python patcher"
-            ));
+            if fname.to_lowercase().ends_with(".json") {
+                warnings.push(format!(
+                    "{fname}: dependency sidecars / cm_dependencies.json are not supported by the builtin engine yet; load order may differ from the Python patcher"
+                ));
+            }
         }
     }
 
@@ -191,7 +211,7 @@ pub fn load_mod_files_with(files: &[PathBuf], opts: &LoadOptions) -> Result<Load
         prio.insert(s.clone(), header_priority(&c));
         contents.insert(s.clone(), c);
     }
-    all.sort_by(|a, b| (prio[&a.0], &a.0).cmp(&(prio[&b.0], &b.0)));
+    all.sort_by(|a, b| (group_of[&a.0], prio[&a.0], &a.0).cmp(&(group_of[&b.0], prio[&b.0], &b.0)));
 
     let mut global = ParseState::default();
     let mut loaded = Vec::new();
