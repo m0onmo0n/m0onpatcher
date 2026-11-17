@@ -7,7 +7,7 @@ use crate::gui::{app_version, titled_box, App, TITLE_GREY};
 impl App {
     pub(crate) fn render_about(&mut self, ui: &mut egui::Ui) {
         titled_box(ui, "About", TITLE_GREY, &mut |ui| {
-            ui.heading(format!("M0on's packer & patcher {}", app_version()));
+            ui.heading(format!("M0on's packer {}", app_version()));
             ui.add_space(4.0);
             ui.label(
                 "A fusion of the m0on-kittypatcher v0.7.6 fork and ScRepacker v0.1.5, for modding Course of Temptation (SugarCube / Twine):",
@@ -19,6 +19,10 @@ impl App {
                 "One program now handles both mod formats on its own. An external KittyPatcher is \
                  optional (see \"Patch engine\" on the Config tab).",
             );
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Source (branches packer and patcher; patcher is the standalone patcher without the packer):");
+                ui.hyperlink_to("github.com/m0onmo0n/m0onpatcher", "https://github.com/m0onmo0n/m0onpatcher");
+            });
 
             ui.add_space(10.0);
             ui.strong("Copyright");

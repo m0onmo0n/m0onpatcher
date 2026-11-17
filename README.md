@@ -1,13 +1,16 @@
-# M0on's packer & patcher
+# m0onpacker
 
 A packer and mod patcher for **Course of Temptation** (SugarCube / Twine). It is a fusion of
 **ScRepacker v0.1.5** (extract the game HTML into editable sources, apply `.diff` mods, repack) and the
 **m0on-kittypatcher v0.7.6 fork** (apply `.mod` files), rewritten in Rust as a built-in engine. One program
 handles both mod formats; no Python and no separate KittyPatcher are needed.
 
+This is the `packer` branch of the m0onpatcher repository. The `patcher` branch is **m0onpatcher**: the same patch
+engine (the `kitty-engine` crate) in a small standalone window, without the packer.
+
 ## Using it
 
-1. Start `m0on-packer` (Windows `.exe`, Linux binary or macOS app).
+1. Start `m0onpacker` (Windows `.exe`, Linux binary or macOS app).
 2. Open the game HTML (drag it onto the window, or pick it on the *Modding* tab). Put your mods in a `mods` folder next to it.
 3. Press **Patch**. The result is `<game>.modded.html` next to the original.
 
@@ -86,7 +89,7 @@ with *KittyPatcher as fallback*, hands the pack to the external patcher).
 Rust 1.85 or newer (edition 2024).
 
 ```
-cargo build --release -p m0on-packer      # the program
+cargo build --release -p m0onpacker      # the program
 cargo test  -p kitty-engine               # engine tests
 cargo dist                                # zip for this platform in target/dist/
 ```

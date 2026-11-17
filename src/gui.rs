@@ -62,7 +62,7 @@ pub fn run(initial_html: Option<PathBuf>, initial_config: Config) -> anyhow::Res
         ..Default::default()
     };
 
-    let title = format!("M0on's packer & patcher {}", app_version());
+    let title = format!("M0on's packer {}", app_version());
     eframe::run_native(
         &title,
         options,
@@ -119,7 +119,7 @@ impl GuiLogger {
     /// the log with per-frame events — and since each push requests a
     /// repaint, the flood becomes a feedback loop that stalls the UI.
     fn is_own_target(target: &str) -> bool {
-        target == "m0on_packer" || target.starts_with("m0on_packer::")
+        target == "m0onpacker" || target.starts_with("m0onpacker::")
     }
 }
 

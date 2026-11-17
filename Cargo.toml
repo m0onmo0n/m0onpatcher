@@ -1,15 +1,15 @@
 [package]
-name = "m0on-packer"
+name = "m0onpacker"
 version = "0.1.0"
 edition = "2024"
 
 [package.metadata.bundle]
-name = "M0on's packer & patcher"
-identifier = "me.proton.nuqqur.screpacker"
+name = "M0on's packer"
+identifier = "tech.moonmoon.m0onpacker"
 category = "public.app-category.utilities"
 short_description = "Twine/SugarCube HTML mod packer"
 long_description = """
-M0on's packer & patcher (a fork of nuqqur's ScRepacker) extracts Twine/SugarCube HTML games into editable source \
+M0on's packer (a fork of nuqqur's ScRepacker) extracts Twine/SugarCube HTML games into editable source \
 trees, applies .diff / .mod / KittyPatcher patches, and repacks the \
 result back into a playable HTML file.
 """

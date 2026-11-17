@@ -1,4 +1,4 @@
-M0on's packer & patcher: copyright and credits
+M0on's packer: copyright and credits
 
 Original parts of this fork (the kitty-engine crate, its integration, the engine selector,
 the About tab and related changes): Copyright (c) 2026 m0on. All rights reserved.

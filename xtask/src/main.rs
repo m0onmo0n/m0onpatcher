@@ -1,7 +1,7 @@
 //! Build-helper binary invoked via `cargo dist`. Detects the host OS,
 //! runs the right cargo subcommand (`build --release` on Windows /
 //! Linux, `bundle --release` on macOS), and zips the resulting artefact
-//! into target/dist/m0on-packer-v<version>-<os>.zip.
+//! into target/dist/m0onpacker-v<version>-<os>.zip.
 
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, Write};
@@ -47,28 +47,28 @@ fn run_dist() -> Result<()> {
 
     #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
     {
-        let zip_path = dist_dir.join(format!("m0on-packer-v{version}-{label}.zip"));
+        let zip_path = dist_dir.join(format!("m0onpacker-v{version}-{label}.zip"));
 
         #[cfg(target_os = "windows")]
         {
-            run_cargo(&["build", "--release", "--package", "m0on-packer"])?;
+            run_cargo(&["build", "--release", "--package", "m0onpacker"])?;
             let bin = workspace
                 .join("target")
                 .join("release")
-                .join("m0on-packer.exe");
-            zip_files(&release_files(&workspace, bin, "m0on-packer.exe"), &zip_path)?;
+                .join("m0onpacker.exe");
+            zip_files(&release_files(&workspace, bin, "m0onpacker.exe"), &zip_path)?;
         }
 
         #[cfg(target_os = "linux")]
         {
-            run_cargo(&["build", "--release", "--package", "m0on-packer"])?;
-            let bin = workspace.join("target").join("release").join("m0on-packer");
-            zip_files(&release_files(&workspace, bin, "m0on-packer"), &zip_path)?;
+            run_cargo(&["build", "--release", "--package", "m0onpacker"])?;
+            let bin = workspace.join("target").join("release").join("m0onpacker");
+            zip_files(&release_files(&workspace, bin, "m0onpacker"), &zip_path)?;
         }
 
         #[cfg(target_os = "macos")]
         {
-            run_cargo(&["bundle", "--release", "--package", "m0on-packer"])?;
+            run_cargo(&["bundle", "--release", "--package", "m0onpacker"])?;
             let bundle_dir = workspace
                 .join("target")
                 .join("release")

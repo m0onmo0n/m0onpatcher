@@ -2,7 +2,7 @@
 name = "kitty-engine"
 version = "0.1.0"
 edition = "2024"
-description = "Patch engine for M0on's packer & patcher: a Rust reimplementation of the m0on KittyPatcher 0.7.6 v2 behaviour."
+description = "Patch engine of m0onpatcher: a Rust reimplementation of the m0on KittyPatcher 0.7.6 v2 behaviour."
 
 [dependencies]
 regex = "1"
