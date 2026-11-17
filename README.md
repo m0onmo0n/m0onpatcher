@@ -29,6 +29,29 @@ The three KittyPatcher-style logs (`FailsPatchLog.txt`, `MainPatchLog.txt`, `Mod
 
 The extractor and the compiler are ScRepacker's.
 
+#### Stage builder
+
+The other half of the Modding tools tab builds a game in **stages** in one go, instead of running the patcher once
+per stage folder and copying the HTML between them. It is an ordered list; add to it with the buttons or by dropping
+files and folders on the window, and move things with *Up* / *Down*:
+
+```
+1. Input HTML    CourseOfTemptation.html
+2. Mod file      Bits&Fun V_1.4.2.3_v3.mod
+3. Output HTML   stage1.html                    (written to disk, and the input of what follows)
+4. Mods folder   stage 2\mods
+5. Output HTML   CourseOfTemptation.modded.html
+```
+
+* The list starts with one **Input HTML**. **Mods** items are a single mod file or a whole folder. An **Output HTML** ends a stage.
+* The Mods items between two outputs are **one patch run**, like a stage folder: the mods load in list order (a folder inside itself by `# Priority:` and file name) and can see each other's changes.
+* Each output is written in the form ScRepacker writes (the patched HTML is read into its parts and merged back into the HTML the stage started from), and the next stage reads that file. Mods written against ScRepacker's output, like a stage 2 pack, need this: they do not match the raw patcher output. On the pack it was tested on, a two-stage chain gives exactly the files ScRepacker writes for the same two stage folders.
+* Dropping a `.html` sets the input, a `.mod` / `.kdiff` / `.patch` file or a folder is added as a Mods item at the end of the list, and outputs are added with *Add output HTML* (a save dialog, so an existing file is never picked by accident).
+* The stages run top to bottom. The first stage that fails stops the chain; the outputs written before it stay. Every stage writes its three logs to `<output folder>\logs\<output name>\`.
+* The **Legacy** checkbox applies to every stage. The list is remembered between runs.
+
+Note that the Patcher tab writes the raw patched HTML, like KittyPatcher, not this normalized form.
+
 ### About
 
 What the program is, the copyright notice and the credits.
@@ -198,18 +221,121 @@ share an anchor, and let a line break in an anchor match any whitespace; none of
 
 When a mod set uses something the engine does not support, it stops with a message naming the directive.
 
+## Command line
+
+**`m0onpatcher-cli`** is the terminal version: the same engine and the same code as the window, as a console
+program that the terminal waits for and that returns an exit code, so it can be used in scripts. It comes next to
+`m0onpatcher` in the release zip. (On Windows the window program is built as a window app, so a terminal does not
+wait for it: use `m0onpatcher-cli` there. On Linux and macOS `m0onpatcher` itself also understands these commands
+when it is started with arguments.)
+
+```
+m0onpatcher-cli <command> [options]
+```
+
+| Command | What it does |
+|---|---|
+| `patch` | Apply a folder of mods to a game HTML (the Patcher tab). |
+| `stages` | Run a chain of patch stages in one go (the Stage builder). |
+| `extract` | Extract a game HTML into editable sources (Modding tools, Extract). |
+| `compile` | Compile the sources back into an HTML (Modding tools, Compile). |
+| `help [command]` | Show the help of a command. |
+
+Options for every command:
+
+| Option | What it does |
+|---|---|
+| `-h`, `--help` | Show the help of the command. |
+| `-q`, `--quiet` | Print only warnings, errors and the final result. |
+| `-v`, `--verbose` | Also print the per-block patch log (about a thousand lines for a big pack; it is always in `ModPatchLog.txt`). |
+| `-V`, `--version` | Show the version (instead of a command). |
+
+The exit code is **0** when the command is done, **1** when it failed (a block did not apply, a file is missing, an
+existing source folder would be overwritten, ...), and **2** for wrong arguments. Progress and results go to stdout,
+warnings and errors to stderr, so `> log.txt` and `2> errors.txt` work.
+
+#### `patch`
+
+```
+m0onpatcher-cli patch <game.html> <mods-folder> [options]
+```
+
+| Option | What it does |
+|---|---|
+| `--html <file>`, `--mods <folder>` | The same two things as options, instead of in the first two places (a folder that is given without an option is taken as the mods folder). |
+| `-o`, `--out <file>` | Where to write the result. Default: `<game name>.modded.html` next to the game. |
+| `--legacy-all` | The **Legacy** option: the old `~` / `~~` blocks of mods without a `# Legacy:` header are applied first and replace every match (see "Legacy phase"). |
+
+It does what the Patcher tab does: the raw patched HTML, the three logs in `<game folder>/logs`, and no output file when a block fails.
+
+#### `stages`
+
+```
+m0onpatcher-cli stages --input <game.html> --mods <path> --output <file> [--mods <path> --output <file> ...]
+m0onpatcher-cli stages --file <list.json>
+```
+
+The `--input`, `--mods` and `--output` options are the items of the Stage builder list, and they run in the order you
+write them (the same rules apply, see "Stage builder"). `--mods` is a mod file or a folder and can be repeated.
+
+```
+m0onpatcher-cli stages --input game.html --mods "Bits&Fun.mod" --output stage1.html --mods "stage 2/mods" --output final.html
+```
+
+`--file` reads the list from a JSON file instead (the same list the window saves): an array of items, each one
+`{"Input": "path"}`, `{"Mods": "path"}` or `{"Output": "path"}`. `--legacy-all` applies to every stage.
+
+#### `extract` and `compile`
+
+```
+m0onpatcher-cli extract <game.html> [--src <folder>] [--force]
+m0onpatcher-cli compile <game.html> [--src <folder>] [--out <file>]
+```
+
+| Option | What it does |
+|---|---|
+| `--html <file>` | The game HTML, as an option. |
+| `--src <folder>` | The sources: where `extract` writes them and `compile` reads them. Default: the `src` folder next to the game HTML. A folder given without an option is taken as this, so `compile "my src" --html game.html` works. |
+| `-f`, `--force` | `extract` only: replace an existing source folder. Without it the command refuses, because extracting again replaces the files and changes made there are lost. |
+| `-o`, `--out <file>` | `compile` only: where to write the result. Default: `<game name>.merged.html` next to the game. |
+
+`compile` needs the original game HTML too: the sources are merged into it as the reference document. Extracting a game
+and compiling it again without changes gives back the original file, byte for byte.
+
+#### The older `kitty-patch` tool
+
+The engine crate also has a small tool, `kitty-patch <input.html> <mods_dir> <out.html> [--crlf] [--legacy-all]`
+(built with `cargo build --release -p kitty-engine --bin kitty-patch`), used to compare the engine with other
+patchers: it writes the raw result even when blocks failed, no logs, and exits with 1 when a block failed
+(`KITTY_PROGRESS=1` prints stage messages, `KITTY_LOG=<file>` dumps the full log). `kitty-dump <mods_dir> <out.json>`
+writes what the engine understood from a mods folder as JSON. For everyday use, `m0onpatcher-cli patch` is the one to use.
+
 ## Building
 
 Rust 1.85 or newer (edition 2024).
 
 ```
-cargo build --release -p m0onpatcher      # the program
+cargo build --release -p m0onpatcher      # the window and the command line program
 cargo test  -p kitty-engine               # engine tests
 cargo dist                                # zip for this platform in target/dist/
 ```
 
-The patch engine is the `crates/kitty-engine` crate; m0onpacker depends on it. It compiles for Windows, Linux
-and macOS (checked with `cargo check`; Linux needs the usual X11/Wayland development libraries for the GUI).
+The patch engine is the `crates/kitty-engine` crate; m0onpacker depends on it.
+
+**Windows** is the platform it is built and tested on. The exe starts on PCs without the Visual C++ runtime.
+
+**Linux and macOS** are supported by the code (the window, the file dialogs and the drag-and-drop work through
+cross-platform crates, and the Windows-only exe icon step is skipped), but no build has been run on a real Linux or
+macOS machine yet: `cargo check` passes for `x86_64-unknown-linux-gnu` and `aarch64-apple-darwin` only. No special
+steps are known to be needed, `cargo build --release -p m0onpatcher` is the same command. Things to expect:
+
+* **Linux:** the file dialogs use the desktop's `xdg-desktop-portal` at run time (present on most desktops). If the
+  build stops on a missing system library (for example `xkbcommon` or `xcb`), install its `-dev` package.
+  The window is forced onto X11 (XWayland on Wayland desktops) because drag-and-drop does not work on native Wayland.
+* **macOS:** `cargo build --release` gives a plain binary. `cargo dist` builds an `.app` with `cargo bundle`, so run
+  `cargo install cargo-bundle` first. The `.app` has no icon yet (only the Windows exe and the window icon are set).
+
+If you try it on Linux or macOS, please report what you hit.
 
 ## Credits and copyright
 

@@ -14,6 +14,18 @@ M0on's patcher applies .mod files (KittyPatcher format) to a Twine/SugarCube gam
 with a built-in Rust engine. No Python and no separate KittyPatcher are needed.
 """
 
+[lib]
+name = "m0onpatcher"
+path = "src/lib.rs"
+
+[[bin]]
+name = "m0onpatcher"
+path = "src/main.rs"
+
+[[bin]]
+name = "m0onpatcher-cli"
+path = "src/bin/m0onpatcher-cli.rs"
+
 [workspace]
 members = ["xtask", "crates/kitty-engine"]
 

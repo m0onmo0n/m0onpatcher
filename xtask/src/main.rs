@@ -56,14 +56,20 @@ fn run_dist() -> Result<()> {
                 .join("target")
                 .join("release")
                 .join("m0onpatcher.exe");
-            zip_files(&release_files(&workspace, bin, "m0onpatcher.exe"), &zip_path)?;
+            let mut files = release_files(&workspace, bin, "m0onpatcher.exe");
+            let cli = workspace.join("target").join("release").join("m0onpatcher-cli.exe");
+            files.push((cli, "m0onpatcher-cli.exe".to_string()));
+            zip_files(&files, &zip_path)?;
         }
 
         #[cfg(target_os = "linux")]
         {
             run_cargo(&["build", "--release", "--package", "m0onpatcher"])?;
             let bin = workspace.join("target").join("release").join("m0onpatcher");
-            zip_files(&release_files(&workspace, bin, "m0onpatcher"), &zip_path)?;
+            let mut files = release_files(&workspace, bin, "m0onpatcher");
+            let cli = workspace.join("target").join("release").join("m0onpatcher-cli");
+            files.push((cli, "m0onpatcher-cli".to_string()));
+            zip_files(&files, &zip_path)?;
         }
 
         #[cfg(target_os = "macos")]
