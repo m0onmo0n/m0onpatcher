@@ -1,0 +1,39 @@
+# Build artifacts
+/target
+debug/
+*.d
+*.o
+*.so
+*.dylib
+*.dll
+*.rlib
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.*
+
+# Generated files
+*.pdb
+*.exe
+
+# Custom
+/other
+/.claude
+/demo
+/screpacker-logs
+/screpacker-config.json
+/versions
+
+# Python helper scripts
+__pycache__/
+
+# Working notes, not published
+/docs/engine-design.md

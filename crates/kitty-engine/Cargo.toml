@@ -1,0 +1,21 @@
+[package]
+name = "kitty-engine"
+version = "0.1.0"
+edition = "2024"
+description = "Patch engine for M0on's packer & patcher: a Rust reimplementation of the m0on KittyPatcher 0.7.6 v2 behaviour."
+
+[dependencies]
+regex = "1"
+memchr = "2"
+indexmap = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+anyhow = "1"
+
+[[bin]]
+name = "kitty-dump"
+path = "src/bin/kitty-dump.rs"
+
+[[bin]]
+name = "kitty-patch"
+path = "src/bin/kitty-patch.rs"
