@@ -32,7 +32,7 @@ use log::{Level, LevelFilter, Log, Metadata, Record};
 use serde::{Deserialize, Serialize};
 
 const CONFIG_FILE: &str = "m0onpatcher-config.json";
-const SIZE_COMPACT: [f32; 2] = [680.0, 330.0];
+const SIZE_COMPACT: [f32; 2] = [680.0, 360.0];
 const SIZE_WITH_LOG: [f32; 2] = [900.0, 650.0];
 const ICON_PNG: &[u8] = include_bytes!("../assets/icon-256.png");
 const REPO_URL: &str = "https://github.com/m0onmo0n/m0onpatcher";
@@ -51,11 +51,13 @@ struct Config {
     /// Output file chosen with "Save as"; `None` means `<name>.modded.html` next to the game HTML.
     output: Option<PathBuf>,
     show_log: bool,
+    /// legacy phase: `~` / `~~` blocks run first and replace every match (see `kitty_engine::load::LoadOptions`)
+    legacy_replace_all: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { html: None, mods: None, output: None, show_log: true }
+        Self { html: None, mods: None, output: None, show_log: true, legacy_replace_all: false }
     }
 }
 
@@ -202,11 +204,22 @@ struct PatchJob {
     html: PathBuf,
     mods: PathBuf,
     output: PathBuf,
+    legacy_replace_all: bool,
 }
 
 /// Rough position of the engine's progress messages on the bar (the engine only reports stages,
 /// and "Applying replacements: n/total" while it works through the Replace blocks).
 fn stage_progress(msg: &str) -> f32 {
+    if let Some(rest) = msg.strip_prefix("Applying legacy blocks: ") {
+        if let Some((n, t)) = rest.split_once('/') {
+            if let (Ok(n), Ok(t)) = (n.trim().parse::<f32>(), t.trim().parse::<f32>()) {
+                if t > 0.0 {
+                    return 0.12 + 0.03 * (n / t).min(1.0);
+                }
+            }
+        }
+        return 0.12;
+    }
     if let Some(rest) = msg.strip_prefix("Applying replacements: ") {
         if let Some((n, t)) = rest.split_once('/') {
             if let (Ok(n), Ok(t)) = (n.trim().parse::<f32>(), t.trim().parse::<f32>()) {
@@ -218,6 +231,7 @@ fn stage_progress(msg: &str) -> f32 {
         return 0.15;
     }
     match msg {
+        "Applying legacy blocks" => 0.12,
         "Applying replacements" => 0.15,
         "Applying passage and function directives" => 0.65,
         "Adding passages, scripts and styles" => 0.85,
@@ -233,7 +247,8 @@ fn run_patch(job: &PatchJob, r: &Reporter) -> anyhow::Result<String> {
     }
 
     r.line("INFO", format!("Loading mods from {}", job.mods.display()));
-    let loaded = kitty_engine::load::load_mods(&job.mods).context("load mods")?;
+    let opts = kitty_engine::load::LoadOptions { legacy_replace_all: job.legacy_replace_all };
+    let loaded = kitty_engine::load::load_mods_with(&job.mods, &opts).context("load mods")?;
     for w in &loaded.warnings {
         r.line("WARN", w);
     }
@@ -241,6 +256,18 @@ fn run_patch(job: &PatchJob, r: &Reporter) -> anyhow::Result<String> {
         bail!("no .mod files found in {}", job.mods.display());
     }
     r.line("INFO", format!("Applying {} mod file(s) with the internal engine", loaded.loaded_mods.len()));
+    if !loaded.state.legacy_list.is_empty() {
+        let mut mods: Vec<&str> = loaded.state.legacy_list.iter().map(|e| e.mod_file.as_str()).collect();
+        mods.dedup();
+        r.line(
+            "INFO",
+            format!(
+                "Legacy phase: {} ~ / ~~ block(s) of {} mod file(s) are applied first and replace every match",
+                loaded.state.legacy_list.len(),
+                mods.len()
+            ),
+        );
+    }
     r.progress(0.05);
 
     // Read the HTML the way KittyPatcher does (Python text mode: universal newlines).
@@ -507,7 +534,7 @@ impl App {
             return;
         };
         self.auto_scroll = true;
-        let job = PatchJob { html, mods, output };
+        let job = PatchJob { html, mods, output, legacy_replace_all: self.cfg.legacy_replace_all };
         spawn_task(self.shared.clone(), ctx.clone(), "Patching", false, move |r| run_patch(&job, r));
     }
 
@@ -591,6 +618,17 @@ impl App {
                 self.cfg.output = Some(p);
                 save_config(&self.cfg);
             }
+        }
+
+        let mut legacy = self.cfg.legacy_replace_all;
+        let legacy_box = ui
+            .add_enabled(!running, egui::Checkbox::new(&mut legacy, "Legacy ~ blocks: replace every match, for mods without a # Legacy header"))
+            .on_hover_text(
+                "Default for the old ~ / ~~ blocks of mods that have no '# Legacy:' header line. On: they are                  applied before everything else and each one replaces every match in the file, like KittyPatcher                  0.1.5c did. Off: they replace only the first match, in load order, like the other blocks. A mod can                  decide for itself with '# Legacy: all' or '# Legacy: first' in its header. Replace: blocks are not                  affected. Replacing every match can change text that a later block needs; the log then names the                  block that did it.",
+            );
+        if legacy_box.changed() {
+            self.cfg.legacy_replace_all = legacy;
+            save_config(&self.cfg);
         }
 
         ui.add_space(4.0);

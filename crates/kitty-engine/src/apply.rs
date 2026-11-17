@@ -494,6 +494,78 @@ impl<'a> P<'a> {
     }
 
     // ---------------------------------------------------------------------
+    // Legacy phase: `~` / `~~` blocks, applied first, every match replaced
+    // ---------------------------------------------------------------------
+    /// The legacy `~` / `~~` blocks (collected by `LoadOptions::legacy_replace_all`), in load order, each one
+    /// replacing every occurrence of its anchor in the whole file, like KittyPatcher 0.1.5c did. The anchor and
+    /// replacement are handled like a classic `Replace:` (escaping, `[to]`, raw script-block fallback); the
+    /// context (passage text or script block) of the first match decides how the replacement is escaped.
+    /// A block without a match is a failure, but the others still run.
+    fn phase0_legacy(&mut self) -> Result<()> {
+        let st = self.st;
+        let total = st.legacy_list.len();
+        for (n, entry) in st.legacy_list.iter().enumerate() {
+            if n > 0 && n % 250 == 0 {
+                self.report(&format!("Applying legacy blocks: {n}/{total}"));
+            }
+            let old_expanded = update_old_lines_from_html(&entry.old, &self.html);
+            let mut old_lines = resolve_pid_auto_in_anchor(&escape_twine_tags(&old_expanded), &self.html);
+            let old_raw = resolve_pid_auto_in_anchor(&old_expanded, &self.html);
+            check_literal_anchor(&old_lines)?;
+            check_literal_anchor(&old_raw)?;
+
+            let mut first = self.html.ffind(&old_lines);
+            if first.is_none() && old_raw != old_lines {
+                if let Some(p) = self.html.ffind(&old_raw) {
+                    old_lines = old_raw;
+                    first = Some(p);
+                }
+            }
+            let Some(start) = first else {
+                // name the earlier legacy blocks that already rewrote part of this text (replace-all side effect)
+                let culprits: Vec<String> = st.legacy_list[..n]
+                    .iter()
+                    .filter(|e| e.old.len() >= 8 && e.old != entry.old && old_lines.contains(e.old.as_str()))
+                    .take(3)
+                    .map(|e| format!("'{}' ({})", short(&e.old, 70).replace('\n', " "), e.mod_file))
+                    .collect();
+                let mut msg = format!("No match found for '{old_lines}'");
+                if !culprits.is_empty() {
+                    msg.push_str(&format!(
+                        "
+  (an earlier legacy block replaced text inside this anchor in every place it occurs: {})",
+                        culprits.join(", ")
+                    ));
+                }
+                self.out.log.push(msg.clone());
+                self.out.fail_log.push(msg);
+                self.out.replacements_failed += 1;
+                continue;
+            };
+            let ctx = context_at(&self.html, start);
+
+            let mut apply_lines = entry.new.clone();
+            if apply_lines.contains("pid=\"auto\"") || apply_lines.contains("pid=\"AUTO\"") {
+                apply_lines = resolve_auto_pids(&apply_lines, &mut self.next_pid);
+            }
+            if ctx == Ctx::Script && !old_lines.contains("&lt;") && !old_lines.contains("&gt;") {
+                apply_lines = unescape_for_raw(&apply_lines);
+            }
+            if ctx == Ctx::Passage && (apply_lines.contains("<<") || apply_lines.contains(">>")) {
+                apply_lines = escape_twine_tags(&apply_lines);
+            }
+            let count = replace_all_in_place(&mut self.html, &old_lines, &apply_lines);
+            self.out.log.push(format!(
+                "Legacy: replaced {count} occurrence(s) of '{}' ({})",
+                short(&old_lines, 80).replace('\n', " "),
+                entry.mod_file
+            ));
+            self.out.replacements_made += 1;
+        }
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------------
     // ReplaceReg
     // ---------------------------------------------------------------------
     fn phase_replace_reg(&mut self) -> Result<()> {
@@ -1146,6 +1218,12 @@ pub fn patch_with_progress(input: &str, st: &ParseState, loaded_mods: &[String],
         early_injected: HashSet::new(),
     };
 
+    if !st.legacy_list.is_empty() {
+        p.report("Applying legacy blocks");
+        p.phase0_legacy()?;
+        // the passage snapshot used by phase 1 must see the text the legacy phase produced
+        p.snap = split_html(&p.html);
+    }
     p.report("Applying replacements");
     p.phase1()?;
     p.report("Applying passage and function directives");
