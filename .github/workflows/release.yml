@@ -1,0 +1,97 @@
+# Builds the release zips (Windows and Linux) and attaches them to a DRAFT release on GitHub.
+#
+# Making a release: push a tag named after the program and its version, from the branch you want to release:
+#     git tag patcher-v0.1.0 && git push origin patcher-v0.1.0     (the patcher branch: m0onpatcher)
+#     git tag packer-v0.1.0  && git push origin packer-v0.1.0      (the packer branch: m0onpacker)
+# The version in the tag has to match the version in Cargo.toml, otherwise the run stops. The release is created as
+# a draft: open it on GitHub (Releases), check the zips and the notes, and press "Publish release" when it should go
+# public. Nothing is public before that.
+#
+# Trying the builds without a tag: Actions tab -> Release -> Run workflow. The zips are then attached to the run
+# (Artifacts at the bottom of the run page) and no release is created.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "patcher-v*"
+      - "packer-v*"
+  workflow_dispatch:
+
+# needed to create the release and upload the zips to it
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          # an older Ubuntu on purpose: a binary built there also runs on newer distributions
+          - name: Linux
+            os: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches the version in Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag_version="${GITHUB_REF_NAME#*-v}"
+          cargo_version="$(grep -m1 '^version' Cargo.toml | cut -d '"' -f2)"
+          echo "tag: $tag_version, Cargo.toml: $cargo_version"
+          test "$tag_version" = "$cargo_version"
+
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+
+      # If the Linux build ever stops on a missing system library, install its -dev package here
+      # (sudo apt-get install -y <package>) in a step before this one.
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Build the zip
+        run: cargo dist
+
+      - name: Keep the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: zip-${{ matrix.name }}
+          path: target/dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Draft release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: zip-*
+          merge-multiple: true
+          path: dist
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          case "$GITHUB_REF_NAME" in
+            patcher-v*) title="m0onpatcher ${GITHUB_REF_NAME#patcher-v}" ;;
+            packer-v*)  title="m0onpacker ${GITHUB_REF_NAME#packer-v}" ;;
+            *)          title="$GITHUB_REF_NAME" ;;
+          esac
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/*.zip --repo "$GITHUB_REPOSITORY" --title "$title" --generate-notes --draft
