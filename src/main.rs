@@ -194,13 +194,13 @@ fn run_cli(args: Vec<String>) -> Result<()> {
     let mut args = args.into_iter();
     let command = args.next().ok_or_else(|| {
         anyhow!(
-            "Usage: screpacker <command> [args...]\n  commands: extract, merge, diff, patch, livemerge"
+            "Usage: m0onpacker <command> [args...]\n  commands: extract, merge, diff, patch, livemerge"
         )
     })?;
 
     let html = args
         .next()
-        .ok_or_else(|| anyhow!("Usage: screpacker {command} <html-file>"))?;
+        .ok_or_else(|| anyhow!("Usage: m0onpacker {command} <html-file>"))?;
     let html_path = Path::new(&html);
 
     match command.as_str() {
