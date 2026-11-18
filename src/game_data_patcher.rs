@@ -1008,7 +1008,7 @@ pub(crate) fn perform_kitty_patch(
     // Built-in engine first (unless the config asks for the external KittyPatcher only).
     let mode = config.engine_mode();
     if mode != EngineMode::External {
-        match perform_builtin_patch(html_path, mod_files) {
+        match perform_builtin_patch(html_path, mod_files, config.legacy_replace_all) {
             Ok(data) => return Ok(data),
             Err(BuiltinError::Unsupported(reason)) if mode == EngineMode::InternalFallback => {
                 info!("Built-in patch engine cannot handle this mod set ({reason}); falling back to the external KittyPatcher");
@@ -1108,11 +1108,21 @@ enum BuiltinError {
 
 /// Run the built-in patch engine (crate `kitty-engine`) instead of the external KittyPatcher.
 /// Writes the same three log files the external patcher writes into `tmp\kitty\mods\logs`.
-fn perform_builtin_patch(html_path: &Path, mod_files: &[PathBuf]) -> Result<GameData, BuiltinError> {
+fn perform_builtin_patch(html_path: &Path, mod_files: &[PathBuf], legacy_replace_all: bool) -> Result<GameData, BuiltinError> {
     let started = std::time::Instant::now();
     info!("Applying {} .mod files with the internal engine", mod_files.len());
-    let loaded = kitty_engine::load::load_mod_files(mod_files)
+    let opts = kitty_engine::load::LoadOptions { legacy_replace_all };
+    let loaded = kitty_engine::load::load_mod_files_with(mod_files, &opts)
         .map_err(|err| BuiltinError::Failed(format!("built-in engine: {err:#}")))?;
+    if !loaded.state.legacy_list.is_empty() {
+        let mut mods: Vec<&str> = loaded.state.legacy_list.iter().map(|e| e.mod_file.as_str()).collect();
+        mods.dedup();
+        info!(
+            "Legacy phase: {} ~ / ~~ block(s) of {} mod file(s) are applied first and replace every match",
+            loaded.state.legacy_list.len(),
+            mods.len()
+        );
+    }
     for w in &loaded.warnings {
         warn!("Built-in engine: {w}");
     }

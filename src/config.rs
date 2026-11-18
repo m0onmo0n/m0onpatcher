@@ -10,6 +10,9 @@ pub struct Config {
     /// Patch engine for `.mod` files: `"builtin"` (internal engine only), `"auto"` (internal engine,
     /// KittyPatcher as fallback) or `"external"` (KittyPatcher only). See [`Config::engine_mode`].
     pub engine: String,
+    /// Legacy phase of the internal engine: the old `~` / `~~` blocks of mods without a `# Legacy:` header are
+    /// applied first and replace every match (KittyPatcher 0.1.5c behaviour). Off: first match only, in load order.
+    pub legacy_replace_all: bool,
     pub kittypatcher_path: String,
     pub python_path: String,
     pub browser_path: String,

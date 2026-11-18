@@ -132,6 +132,7 @@ pub fn proc_replacement_old(mod_content: &str, st: &mut ParseState, mod_file: &s
         let old_stripped = py_strip(&old_lines).to_string();
         let new_stripped = auto_escape_passage_bodies(py_strip(&new_lines));
 
+        st.legacy_pairs.push((old_stripped.clone(), new_stripped.clone()));
         st.mod_dict.insert(old_stripped.clone(), ReplaceEntry(new_stripped, blank_guards()));
         st.mod_list.push((old_stripped.clone(), mod_file.to_string()));
         st.key_to_mod.insert(old_stripped.clone(), mod_file.to_string());

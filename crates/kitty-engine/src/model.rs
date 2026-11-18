@@ -97,10 +97,24 @@ pub struct RegEntry {
     pub mod_file: String,
 }
 
+/// One legacy `~` / `~~` block kept apart from `mod_list`, for the legacy phase (see `LoadOptions`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LegacyEntry {
+    /// anchor text, already escaped like a `mod_list` key
+    pub old: String,
+    /// replacement text, already escaped like a `mod_dict` value
+    pub new: String,
+    pub mod_file: String,
+}
+
 /// Everything the Python `load_mods` returns (the registries), plus a log
 /// and the list of directives this engine does not support yet.
 #[derive(Clone, Debug, Default)]
 pub struct ParseState {
+    /// Legacy `~` / `~~` blocks, in order, when they are collected for the legacy phase instead of `mod_list`.
+    pub legacy_list: Vec<LegacyEntry>,
+    /// Scratch output of `proc_replacement_old`: every legacy block of the file just parsed, `(old, new)` in file order.
+    pub legacy_pairs: Vec<(String, String)>,
     pub mod_dict: IndexMap<String, ReplaceEntry>,
     pub mod_list: Vec<(String, String)>,
     pub mod_file_indexes: IndexMap<String, Vec<String>>,

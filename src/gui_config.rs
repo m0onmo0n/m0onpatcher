@@ -195,6 +195,30 @@ impl App {
                 config::EngineMode::External => {}
             }
 
+            // ---- legacy phase for the old ~ / ~~ blocks (internal engine only) ----
+            ui.horizontal(|ui| {
+                ui.add_space(config_label_width + ui.spacing().item_spacing.x);
+                let mut legacy = self.config.legacy_replace_all;
+                let response = ui
+                    .add_enabled(
+                        mode != config::EngineMode::External,
+                        egui::Checkbox::new(&mut legacy, "Legacy ~ blocks: replace every match, for mods without a # Legacy header"),
+                    )
+                    .on_hover_text(concat!(
+                        "Default for the old ~ / ~~ blocks of mods that have no '# Legacy:' header line. ",
+                        "On: they are applied before everything else and each one replaces every match in the file, ",
+                        "like KittyPatcher 0.1.5c did. Off: they replace only the first match, in load order, like ",
+                        "the other blocks. A mod can decide for itself with '# Legacy: all' or '# Legacy: first' ",
+                        "in its header. Replace: blocks are not affected. Replacing every match can change text ",
+                        "that a later block needs; the log then names the block that did it. ",
+                        "Internal engine only (an external KittyPatcher ignores it).",
+                    ));
+                if response.changed() {
+                    self.config.legacy_replace_all = legacy;
+                    changed = true;
+                }
+            });
+
             let show_kp = mode != config::EngineMode::Internal;
             let kp_display = Some(self.kittypatcher_tool.display_label());
             let kp_tooltip = concat!(
