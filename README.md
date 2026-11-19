@@ -330,7 +330,7 @@ It builds the same way on Windows, Linux and macOS (`cargo build --release -p m0
   onto X11 (XWayland on Wayland desktops) because drag-and-drop does not work on native Wayland.
 * **macOS:** `cargo build --release` gives a plain binary. `cargo dist` builds an `.app` with `cargo bundle`, so run
   `cargo install cargo-bundle` first. The `.app` has no icon yet (only the Windows exe and the window icon are set) and
-  is not signed, so macOS may ask you to confirm the first start (right-click the app, Open). The zip has the app only,
+  is only ad-hoc signed (not notarized by Apple), so on the first start macOS asks you to confirm it: right-click the app and choose Open, or allow it under System Settings, Privacy & Security. If macOS says the app is "damaged", run `xattr -cr` on the app once to clear the download flag. The zip has the app only,
   no command line program: build `m0onpatcher-cli` with cargo if you want it on a Mac.
 
 If you hit a problem on any of them, please report it.

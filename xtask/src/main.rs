@@ -81,6 +81,7 @@ fn run_dist() -> Result<()> {
                 .join("bundle")
                 .join("osx");
             let app = find_first_app_bundle(&bundle_dir)?;
+            codesign_adhoc(&app)?;
             let app_name = app
                 .file_name()
                 .and_then(|s| s.to_str())
@@ -253,6 +254,26 @@ fn file_options(src: &Path) -> Result<SimpleFileOptions> {
         let _ = src;
     }
     Ok(opts)
+}
+
+/// Apple silicon Macs refuse to start an app that has no code signature at all ("is damaged and can't be
+/// opened" once it has been downloaded). An ad-hoc signature (`-`) needs no Apple developer account; macOS then
+/// treats the app as coming from an unidentified developer (right-click, Open) instead of as damaged.
+#[cfg(target_os = "macos")]
+fn codesign_adhoc(app: &Path) -> Result<()> {
+    let status = Command::new("codesign")
+        .args(["--force", "--deep", "--sign", "-"])
+        .arg(app)
+        .status()
+        .context("spawn codesign")?;
+    if !status.success() {
+        bail!("codesign failed with {status}");
+    }
+    let verify = Command::new("codesign").args(["--verify", "--deep", "--strict", "--verbose=2"]).arg(app).status().context("spawn codesign --verify")?;
+    if !verify.success() {
+        bail!("codesign --verify failed with {verify}");
+    }
+    Ok(())
 }
 
 fn find_first_app_bundle(dir: &Path) -> Result<PathBuf> {
