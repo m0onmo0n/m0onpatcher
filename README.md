@@ -238,25 +238,23 @@ cargo dist                               # zip for this platform in target/dist/
 
 The patch engine is the `crates/kitty-engine` crate, shared with the `patcher` branch.
 
-**Windows** is the platform it is built and tested on. The exe starts on PCs without the Visual C++ runtime.
+It builds the same way on Windows, Linux and macOS. Notes per platform:
 
-**Linux and macOS** are supported by the code (the window, the file dialogs and the drag-and-drop work through
-cross-platform crates), but no build has been run on a real Linux or macOS machine yet: `cargo check` passes for
-`x86_64-unknown-linux-gnu` and `aarch64-apple-darwin` only. Things to expect:
-
+* **Windows:** the exe starts on PCs without the Visual C++ runtime.
 * **Linux:** the file dialogs use the desktop's `xdg-desktop-portal` at run time (present on most desktops). If the
-  build stops on a missing system library (for example `xkbcommon` or `xcb`), install its `-dev` package.
-  The window is forced onto X11 (XWayland on Wayland desktops) because drag-and-drop does not work on native Wayland.
+  build stops on a missing system library (for example `xkbcommon` or `xcb`), install its `-dev` package. The window
+  is forced onto X11 (XWayland on Wayland desktops) because drag-and-drop does not work on native Wayland.
 * **macOS:** `cargo build --release` gives a plain binary. `cargo dist` builds an `.app` with `cargo bundle`, so run
-  `cargo install cargo-bundle` first. The `.app` has no icon yet.
+  `cargo install cargo-bundle` first. The `.app` has no icon yet and is not signed, so macOS may ask you to confirm
+  the first start (right-click the app, Open).
 
-If you try it on Linux or macOS, please report what you hit.
+If you hit a problem on any of them, please report it.
 
 ## Credits and copyright
 
 Original parts of this fork: Copyright (c) 2026 m0on. All rights reserved. ScRepacker and KittyPatcher are
-published without a licence; their authors keep all rights in their work, and no licence for it is granted here.
-See `NOTICE.txt`.
+published without a licence and their authors keep all rights in their work; they have given m0on their permission to
+build on it and to distribute this program. That permission covers this program only. See `NOTICE.txt`.
 
 * **nuqqur**: ScRepacker (https://gitgud.io/nuqqur/screpacker-rs/), the extractor, packer and interface this program is built on
 * **LK / kitty**: original creator of KittyPatcher (0.1.5c and 0.2.0a)

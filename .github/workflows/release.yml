@@ -1,4 +1,4 @@
-# Builds the release zips (Windows and Linux) and attaches them to a DRAFT release on GitHub.
+# Builds the release zips (Windows, Linux and macOS) and attaches them to a DRAFT release on GitHub.
 #
 # Making a release: push a tag named after the program and its version, from the branch you want to release:
 #     git tag patcher-v0.1.0 && git push origin patcher-v0.1.0     (the patcher branch: m0onpatcher)
@@ -40,6 +40,9 @@ jobs:
           # an older Ubuntu on purpose: a binary built there also runs on newer distributions
           - name: Linux
             os: ubuntu-22.04
+          # macos-latest is an Apple silicon (arm64) Mac, so this zip is for M1 and newer
+          - name: macOS
+            os: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -56,6 +59,11 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
           rustc --version
+
+      # cargo dist builds the .app with cargo-bundle on a Mac
+      - name: Install cargo-bundle
+        if: runner.os == 'macOS'
+        run: cargo install cargo-bundle --locked
 
       # If the Linux build ever stops on a missing system library, install its -dev package here
       # (sudo apt-get install -y <package>) in a step before this one.

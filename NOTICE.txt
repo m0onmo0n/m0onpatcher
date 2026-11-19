@@ -5,8 +5,9 @@ the About tab and related changes): Copyright (c) 2026 m0on. All rights reserved
 No licence is granted to copy, modify or redistribute this program.
 
 This program is built on the work of others. None of the following projects carries a
-licence, so their authors keep all rights in their work and no licence for it is granted
-or implied here:
+licence, so their authors keep all rights in their work. The authors of ScRepacker and of
+KittyPatcher have given m0on their permission to build on their work and to distribute
+this program:
 
   - ScRepacker (screpacker-rs) by nuqqur, https://gitgud.io/nuqqur/screpacker-rs/ :
     the extractor, packer, .diff handling and interface this program is built on.
@@ -15,5 +16,5 @@ or implied here:
     CoderMaverick: the behaviour the built-in kitty-engine reimplements.
   - The Course of Temptation modding community.
 
-Credit is not a licence. If the authors above grant permission or publish a licence, this
-notice will be updated.
+That permission covers this program only. It is not a licence for the original work of
+those authors, which stays theirs.

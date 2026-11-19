@@ -28,8 +28,9 @@ impl App {
             ui.strong("Copyright");
             ui.label("Original parts of this fork: Copyright (c) 2026 m0on. All rights reserved.");
             ui.label(
-                "ScRepacker and KittyPatcher are published without a licence: their authors keep all \
-                 rights in their work, and no licence for it is granted here. Credit is not a licence.",
+                "ScRepacker and KittyPatcher are published without a licence and their authors keep all \
+                 rights in their work. They have given m0on their permission to build on it and to \
+                 distribute this program; that permission covers this program only.",
             );
 
             ui.add_space(10.0);
