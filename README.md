@@ -245,8 +245,9 @@ It builds the same way on Windows, Linux and macOS. Notes per platform:
   build stops on a missing system library (for example `xkbcommon` or `xcb`), install its `-dev` package. The window
   is forced onto X11 (XWayland on Wayland desktops) because drag-and-drop does not work on native Wayland.
 * **macOS:** `cargo build --release` gives a plain binary. `cargo dist` builds an `.app` with `cargo bundle`, so run
-  `cargo install cargo-bundle` first. The `.app` has no icon yet and is not signed, so macOS may ask you to confirm
-  the first start (right-click the app, Open).
+  `cargo install cargo-bundle` first. The `.app` has no icon yet and is only ad-hoc signed (not notarized by Apple), so on the
+  first start macOS asks you to confirm it: right-click the app and choose Open, or allow it under System Settings,
+  Privacy & Security. If macOS says the app is "damaged", run `xattr -cr` on the app once to clear the download flag.
 
 If you hit a problem on any of them, please report it.
 
