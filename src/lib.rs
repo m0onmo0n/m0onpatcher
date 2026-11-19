@@ -445,7 +445,8 @@ fn run_compile(html: &Path, src: &Path, output: &Path) -> anyhow::Result<String>
     Ok(format!("Done: compiled {} in {:.1} s", output.display(), started.elapsed().as_secs_f64()))
 }
 
-fn open_folder(path: &Path) {
+/// Open a folder in the file manager, or a file with the program the system has for it (an .html opens in the browser).
+fn open_path(path: &Path) {
     #[cfg(target_os = "windows")]
     let program = "explorer";
     #[cfg(target_os = "macos")]
@@ -716,6 +717,16 @@ impl App {
             if patch.clicked() {
                 self.start_patch(ctx);
             }
+            let can_open = !running && output.as_deref().is_some_and(Path::is_file);
+            if ui
+                .add_enabled(can_open, egui::Button::new("Open").min_size(egui::vec2(80.0, 28.0)))
+                .on_hover_text("Open the patched HTML in the default browser")
+                .clicked()
+            {
+                if let Some(o) = &output {
+                    open_path(o);
+                }
+            }
             self.render_log_toggle_and_status(ui);
         });
     }
@@ -904,6 +915,20 @@ impl App {
             if ui.add_enabled(ok, egui::Button::new("Run stages").min_size(egui::vec2(110.0, 28.0))).clicked() {
                 self.start_stages(ctx);
             }
+            let last_output = self.cfg.pipeline.iter().rev().find_map(|i| match i {
+                Item::Output(p) => Some(p.clone()),
+                _ => None,
+            });
+            let can_open = !running && last_output.as_deref().is_some_and(Path::is_file);
+            if ui
+                .add_enabled(can_open, egui::Button::new("Open").min_size(egui::vec2(80.0, 28.0)))
+                .on_hover_text("Open the last output HTML in the default browser")
+                .clicked()
+            {
+                if let Some(o) = &last_output {
+                    open_path(o);
+                }
+            }
             self.render_log_toggle_and_status(ui);
         });
     }
@@ -944,7 +969,7 @@ impl App {
             }
             if ui.add_enabled(src_exists, egui::Button::new("Open source folder")).clicked() {
                 if let Some(dir) = &src {
-                    open_folder(dir);
+                    open_path(dir);
                 }
             }
             self.render_log_toggle_and_status(ui);
@@ -1011,8 +1036,9 @@ impl App {
                 ui.strong("Copyright");
                 ui.label("Original parts: Copyright (c) 2026 m0on. All rights reserved.");
                 ui.label(
-                    "ScRepacker and KittyPatcher are published without a licence: their authors keep all \
-                     rights in their work, and no licence for it is granted here. Credit is not a licence.",
+                    "ScRepacker and KittyPatcher are published without a licence and their authors keep all \
+                     rights in their work. They have given m0on their permission to build on it and to \
+                     distribute this program; that permission covers this program only.",
                 );
 
                 ui.add_space(10.0);

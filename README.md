@@ -322,29 +322,24 @@ cargo dist                                # zip for this platform in target/dist
 
 The patch engine is the `crates/kitty-engine` crate; m0onpacker depends on it.
 
-**Windows** is the platform it is built and tested on. The exe starts on PCs without the Visual C++ runtime.
+It builds the same way on Windows, Linux and macOS (`cargo build --release -p m0onpatcher`). Notes per platform:
 
-**Linux:** built and in use on a real Linux machine, with the same command (`cargo build --release -p m0onpatcher`).
-Both the window (`m0onpatcher`) and the command line program (`m0onpatcher-cli`) have been tried there. What the code
-does there, in case you meet it on another setup:
+* **Windows:** the exe starts on PCs without the Visual C++ runtime.
+* **Linux:** the file dialogs use the desktop's `xdg-desktop-portal` at run time (present on most desktops). If a build
+  stops on a missing system library (for example `xkbcommon` or `xcb`), install its `-dev` package. The window is forced
+  onto X11 (XWayland on Wayland desktops) because drag-and-drop does not work on native Wayland.
+* **macOS:** `cargo build --release` gives a plain binary. `cargo dist` builds an `.app` with `cargo bundle`, so run
+  `cargo install cargo-bundle` first. The `.app` has no icon yet (only the Windows exe and the window icon are set) and
+  is not signed, so macOS may ask you to confirm the first start (right-click the app, Open). The zip has the app only,
+  no command line program: build `m0onpatcher-cli` with cargo if you want it on a Mac.
 
-* The file dialogs use the desktop's `xdg-desktop-portal` at run time (present on most desktops).
-* If a build stops on a missing system library (for example `xkbcommon` or `xcb`), install its `-dev` package.
-* The window is forced onto X11 (XWayland on Wayland desktops) because drag-and-drop does not work on native Wayland.
-* `m0onpatcher` itself should also understand the command line commands when it is started with arguments, so the
-  separate `m0onpatcher-cli` would be optional there. This has not been tried yet, `m0onpatcher-cli` is the one that has.
-
-**macOS** is supported by the code (the window, the file dialogs and the drag-and-drop work through cross-platform
-crates) but has not been built on a real Mac yet: `cargo check` passes for `aarch64-apple-darwin` only.
-`cargo build --release` gives a plain binary. `cargo dist` builds an `.app` with `cargo bundle`, so run
-`cargo install cargo-bundle` first. The `.app` has no icon yet (only the Windows exe and the window icon are set).
-
-If you try it on macOS or on another Linux setup, please report what you hit.
+If you hit a problem on any of them, please report it.
 
 ## Credits and copyright
 
 Original parts: Copyright (c) 2026 m0on. All rights reserved. ScRepacker and KittyPatcher are published without
-a licence; their authors keep all rights in their work, and no licence for it is granted here. See `NOTICE.txt`.
+a licence and their authors keep all rights in their work; they have given m0on their permission to build on it and
+to distribute this program. That permission covers this program only. See `NOTICE.txt`.
 
 * **LK / kitty**: original creator of KittyPatcher (0.1.5c and 0.2.0a)
 * **CoderMaverick**: author of KittyPatcher v0.4.0, v0.6.0 and the v0.7.x versions, and of the KittyPatcher ecosystem

@@ -5,8 +5,9 @@ Copyright (c) 2026 m0on. All rights reserved.
 No licence is granted to copy, modify or redistribute this program.
 
 This program is built on the work of others. None of the following projects carries a
-licence, so their authors keep all rights in their work and no licence for it is granted
-or implied here:
+licence, so their authors keep all rights in their work. The authors of ScRepacker and of
+KittyPatcher have given m0on their permission to build on their work and to distribute
+this program:
 
   - KittyPatcher by LK / kitty (original creator of KittyPatcher, 0.1.5c and 0.2.0a), and
     KittyPatcher v0.4.0, v0.6.0, the v0.7.x versions and the KittyPatcher ecosystem by
@@ -21,5 +22,5 @@ The program icon (assets/shield-moon.svg, and the PNG and ICO made from it) is t
 https://pictogrammers.com/library/mdi/icon/shield-moon/ , used under the Apache License 2.0
 (https://www.apache.org/licenses/LICENSE-2.0); the colour was changed.
 
-Credit is not a licence. If the authors above grant permission or publish a licence, this
-notice will be updated.
+That permission covers this program only. It is not a licence for the original work of
+those authors, which stays theirs.
