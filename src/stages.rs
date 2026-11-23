@@ -51,6 +51,29 @@ pub struct Plan {
     pub stages: Vec<Stage>,
 }
 
+/// The list as the text of a list file (the same format `m0onpatcher-cli stages --file` reads).
+pub fn to_json(items: &[Item]) -> String {
+    serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Read a list file written by `to_json` (or by hand, see `m0onpatcher-cli help stages`).
+pub fn from_json(text: &str) -> Result<Vec<Item>, String> {
+    serde_json::from_str(text).map_err(|e| format!("this is not a stage list: {e}"))
+}
+
+/// Add mods (files or folders) to the list. They go at the end, except when the list ends with an Output that has
+/// no Mods above it yet (the Output was added first): then they go in front of that Output, where they belong.
+pub fn insert_mods(items: &mut Vec<Item>, paths: Vec<PathBuf>) {
+    let n = items.len();
+    let output_waiting =
+        n >= 2 && matches!(items[n - 1], Item::Output(_)) && matches!(items[n - 2], Item::Input(_) | Item::Output(_));
+    let mut at = if output_waiting { n - 1 } else { n };
+    for path in paths {
+        items.insert(at, Item::Mods(path));
+        at += 1;
+    }
+}
+
 /// Check the list and turn it into stages. The error text is shown to the user as it is.
 pub fn plan(items: &[Item]) -> Result<Plan, String> {
     let Some(first) = items.first() else {
@@ -69,8 +92,15 @@ pub fn plan(items: &[Item]) -> Result<Plan, String> {
                 if pending.is_empty() {
                     return Err(format!("Item {}: this Output has no Mods above it (since the previous Output).", i + 1));
                 }
-                if out == input || stages.iter().any(|s| &s.output == out) {
-                    return Err(format!("Item {}: {} is already used as the input or another output.", i + 1, out.display()));
+                if out == input {
+                    return Err(format!(
+                        "Item {}: {} is already used as the Input HTML. An output cannot overwrite the file it was built from. You do not need it as an input either: every Output is the input of the stage below it.",
+                        i + 1,
+                        out.display()
+                    ));
+                }
+                if stages.iter().any(|s| &s.output == out) {
+                    return Err(format!("Item {}: {} is already used as the Output of an earlier stage; give each stage its own file.", i + 1, out.display()));
                 }
                 stages.push(Stage { mods: std::mem::take(&mut pending), output: out.clone() });
             }
@@ -192,6 +222,38 @@ mod tests {
         assert_eq!(plan.stages[0].mods, vec![p("a.mod"), p("mods2")]);
         assert_eq!(plan.stages[0].output, p("s1.html"));
         assert_eq!(plan.stages[1].mods, vec![p("b.mod")]);
+    }
+
+    #[test]
+    fn mods_go_before_a_waiting_output() {
+        // the Output was added first: the mods land in front of it, in the order given
+        let mut v = vec![Item::Input(p("in.html")), Item::Output(p("o.html"))];
+        insert_mods(&mut v, vec![p("a.mod"), p("b.mod")]);
+        assert_eq!(v, vec![Item::Input(p("in.html")), Item::Mods(p("a.mod")), Item::Mods(p("b.mod")), Item::Output(p("o.html"))]);
+        assert!(plan(&v).is_ok());
+        // a finished stage: the next mods start a new one at the end
+        insert_mods(&mut v, vec![p("c.mod")]);
+        assert_eq!(v.last(), Some(&Item::Mods(p("c.mod"))));
+        // an empty list or mods at the bottom: append
+        let mut e: Vec<Item> = Vec::new();
+        insert_mods(&mut e, vec![p("a.mod")]);
+        assert_eq!(e, vec![Item::Mods(p("a.mod"))]);
+        // two Outputs in a row: the mods go before the last one
+        let mut w = vec![Item::Input(p("in.html")), Item::Mods(p("a.mod")), Item::Output(p("s1.html")), Item::Output(p("s2.html"))];
+        insert_mods(&mut w, vec![p("b.mod")]);
+        assert_eq!(w[3], Item::Mods(p("b.mod")));
+        assert_eq!(w[4], Item::Output(p("s2.html")));
+    }
+
+    #[test]
+    fn list_files_round_trip() {
+        let v = vec![Item::Input(p("in.html")), Item::Mods(p("a.mod")), Item::Output(p("s1.html")), Item::Mods(p("mods2")), Item::Output(p("s2.html"))];
+        assert_eq!(from_json(&to_json(&v)).unwrap(), v);
+        // the by-hand format of the command line help
+        let by_hand = r#"[{"Input":"game.html"},{"Mods":"a.mod"},{"Output":"stage1.html"}]"#;
+        assert_eq!(from_json(by_hand).unwrap().len(), 3);
+        assert!(from_json("{}").unwrap_err().contains("not a stage list"));
+        assert!(from_json("").is_err());
     }
 
     #[test]

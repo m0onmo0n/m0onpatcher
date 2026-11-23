@@ -46,9 +46,10 @@ files and folders on the window, and move things with *Up* / *Down*:
 * The list starts with one **Input HTML**. **Mods** items are a single mod file or a whole folder. An **Output HTML** ends a stage.
 * The Mods items between two outputs are **one patch run**, like a stage folder: the mods load in list order (a folder inside itself by `# Priority:` and file name) and can see each other's changes.
 * Each output is written in the form ScRepacker writes (the patched HTML is read into its parts and merged back into the HTML the stage started from), and the next stage reads that file. Mods written against ScRepacker's output, like a stage 2 pack, need this: they do not match the raw patcher output. On the pack it was tested on, a two-stage chain gives exactly the files ScRepacker writes for the same two stage folders.
-* Dropping a `.html` sets the input, a `.mod` / `.kdiff` / `.patch` file or a folder is added as a Mods item at the end of the list, and outputs are added with *Add output HTML* (a save dialog, so an existing file is never picked by accident).
+* Dropping a `.html` sets the input, a `.mod` / `.kdiff` / `.patch` file or a folder is added as a Mods item at the end of the list (in front of the last Output instead, if that Output has no mods above it yet), and outputs are added with *Add output HTML* (a save dialog, so an existing file is never picked by accident).
 * The stages run top to bottom. The first stage that fails stops the chain; the outputs written before it stay. Every stage writes its three logs to `<output folder>\logs\<output name>\`.
 * The **Legacy** checkbox applies to every stage. The list is remembered between runs.
+* **Save list** writes the list to a `.json` file and **Load list** replaces the current list with one from a file, so a build can be kept, shared or started again later. The file is the same one `m0onpatcher-cli stages --file` reads (see "Command line"). It stores full paths.
 
 Note that the Patcher tab writes the raw patched HTML, like KittyPatcher, not this normalized form.
 
@@ -282,7 +283,7 @@ write them (the same rules apply, see "Stage builder"). `--mods` is a mod file o
 m0onpatcher-cli stages --input game.html --mods "Bits&Fun.mod" --output stage1.html --mods "stage 2/mods" --output final.html
 ```
 
-`--file` reads the list from a JSON file instead (the same list the window saves): an array of items, each one
+`--file` reads the list from a JSON file instead (the same file the Stage builder's *Save list* writes): an array of items, each one
 `{"Input": "path"}`, `{"Mods": "path"}` or `{"Output": "path"}`. `--legacy-all` applies to every stage.
 
 #### `extract` and `compile`

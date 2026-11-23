@@ -527,6 +527,8 @@ struct App {
     sized_for_log: bool,
     /// "extract again?" question is showing (the source folder already exists)
     confirm_extract: bool,
+    /// result of the last Save list / Load list (text, is_error), shown under the stage list
+    list_note: Option<(String, bool)>,
     tools_mode: ToolsMode,
     icon: Option<egui::TextureHandle>,
 }
@@ -562,6 +564,7 @@ impl App {
             mod_count: None,
             sized_for_log,
             confirm_extract: false,
+            list_note: None,
             // M0ON_PATCHER_TOOLS=stages starts the Modding tools tab on the Stage builder (used for screenshots)
             tools_mode: if std::env::var("M0ON_PATCHER_TOOLS").as_deref() == Ok("stages") { ToolsMode::Stages } else { ToolsMode::ExtractCompile },
             icon,
@@ -642,11 +645,11 @@ impl App {
         if self.is_running() || self.tab == Tab::About {
             return;
         }
+        if self.tab == Tab::Tools && self.tools_mode == ToolsMode::Stages {
+            self.stage_drop(dropped);
+            return;
+        }
         for path in dropped {
-            if self.tab == Tab::Tools && self.tools_mode == ToolsMode::Stages {
-                self.stage_drop(path);
-                continue;
-            }
             if path.is_dir() {
                 if self.tab == Tab::Patcher {
                     self.set_mods(path);
@@ -763,20 +766,27 @@ impl App {
     // ---- Stage builder
 
     /// Add something dropped on the window (or chosen with a button) to the stage list.
-    fn stage_drop(&mut self, path: PathBuf) {
-        let ext = path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).unwrap_or_default();
-        if path.is_dir() || ["mod", "kdiff", "patch"].contains(&ext.as_str()) {
-            self.cfg.pipeline.push(stages::Item::Mods(path));
-        } else if ext == "html" || ext == "htm" {
-            // the game HTML is always the first item: it replaces the current one
-            match self.cfg.pipeline.first_mut() {
-                Some(stages::Item::Input(p)) => *p = path,
-                _ => self.cfg.pipeline.insert(0, stages::Item::Input(path)),
+    fn stage_drop(&mut self, paths: Vec<PathBuf>) {
+        let mut mods = Vec::new();
+        for path in paths {
+            let ext = path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).unwrap_or_default();
+            if path.is_dir() || ["mod", "kdiff", "patch"].contains(&ext.as_str()) {
+                mods.push(path);
+            } else if ext == "html" || ext == "htm" {
+                // the game HTML is always the first item: it replaces the current one
+                match self.cfg.pipeline.first_mut() {
+                    Some(stages::Item::Input(p)) => *p = path,
+                    _ => self.cfg.pipeline.insert(0, stages::Item::Input(path)),
+                }
             }
-        } else {
-            return;
         }
+        self.add_mods(mods);
         save_config(&self.cfg);
+    }
+
+    /// Add mods (files or folders) to the stage list (see `stages::insert_mods` for where they go).
+    fn add_mods(&mut self, paths: Vec<PathBuf>) {
+        stages::insert_mods(&mut self.cfg.pipeline, paths);
     }
 
     fn start_stages(&mut self, ctx: &egui::Context) {
@@ -793,6 +803,7 @@ impl App {
 
         // buttons that add items (items can also be dropped on the window)
         let (mut add_input, mut add_files, mut add_folder, mut add_output, mut clear) = (false, false, false, false, false);
+        let (mut save_list, mut load_list) = (false, false);
         ui.horizontal_wrapped(|ui| {
             ui.add_enabled_ui(!running, |ui| {
                 add_input = ui.button("Add input HTML\u{2026}").clicked();
@@ -800,24 +811,51 @@ impl App {
                 add_folder = ui.button("Add mods folder\u{2026}").clicked();
                 add_output = ui.button("Add output HTML\u{2026}").clicked();
                 clear = ui.button("Clear list").clicked();
+                ui.separator();
+                save_list = ui.add_enabled(!self.cfg.pipeline.is_empty(), egui::Button::new("Save list…")).clicked();
+                load_list = ui.button("Load list…").clicked();
             });
         });
+        if save_list {
+            let mut dlg = rfd::FileDialog::new().add_filter("Stage list", &["json"]).set_file_name("stages.json");
+            if let Some(Item::Input(input)) = self.cfg.pipeline.first() {
+                if let Some(dir) = input.parent() {
+                    dlg = dlg.set_directory(dir);
+                }
+            }
+            if let Some(path) = dlg.save_file() {
+                self.list_note = Some(match std::fs::write(&path, stages::to_json(&self.cfg.pipeline)) {
+                    Ok(()) => (format!("Saved the list to {}", path.display()), false),
+                    Err(e) => (format!("Cannot save {}: {e}", path.display()), true),
+                });
+            }
+        }
+        if load_list {
+            if let Some(path) = rfd::FileDialog::new().add_filter("Stage list", &["json"]).pick_file() {
+                self.list_note = Some(match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| stages::from_json(&t)) {
+                    Ok(items) => {
+                        self.cfg.pipeline = items;
+                        save_config(&self.cfg);
+                        (format!("Loaded the list from {}", path.display()), false)
+                    }
+                    Err(e) => (format!("Cannot load {}: {e}", path.display()), true),
+                });
+            }
+        }
         if add_input {
             if let Some(p) = rfd::FileDialog::new().add_filter("HTML", &["html", "htm"]).pick_file() {
-                self.stage_drop(p);
+                self.stage_drop(vec![p]);
             }
         }
         if add_files {
             if let Some(files) = rfd::FileDialog::new().add_filter("Mod files", &["mod", "kdiff", "patch"]).pick_files() {
-                for f in files {
-                    self.cfg.pipeline.push(Item::Mods(f));
-                }
+                self.add_mods(files);
                 save_config(&self.cfg);
             }
         }
         if add_folder {
             if let Some(p) = rfd::FileDialog::new().pick_folder() {
-                self.cfg.pipeline.push(Item::Mods(p));
+                self.add_mods(vec![p]);
                 save_config(&self.cfg);
             }
         }
@@ -884,6 +922,11 @@ impl App {
                 _ => {}
             }
             save_config(&self.cfg);
+        }
+
+        if let Some((text, is_error)) = &self.list_note {
+            let color = if *is_error { egui::Color32::from_rgb(230, 100, 100) } else { egui::Color32::from_rgb(110, 200, 120) };
+            ui.colored_label(color, text);
         }
 
         // is the list runnable?
@@ -1151,13 +1194,15 @@ impl App {
                 .stroke(border)
                 .inner_margin(egui::Margin::same(6))
                 .show(ui, |ui| {
-                    egui::ScrollArea::vertical()
+                    // every log line is exactly one row high (long lines scroll sideways instead of wrapping):
+                    // show_rows assumes equal rows, and wrapped lines made the list and the auto-scroll flip-flop
+                    egui::ScrollArea::both()
                         .auto_shrink([false; 2])
                         .stick_to_bottom(stick)
                         .show_rows(ui, row_h, rows, |ui, range| {
                             ui.set_min_width(ui.available_width());
                             for i in range {
-                                ui.monospace(&guard.log[i]);
+                                ui.add(egui::Label::new(egui::RichText::new(&guard.log[i]).monospace()).wrap_mode(egui::TextWrapMode::Extend));
                             }
                         })
                 })
