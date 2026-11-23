@@ -17,7 +17,8 @@ Start `m0onpatcher` (Windows `.exe` or Linux binary). It has three tabs.
 2. Press **Patch**. The result is `<game>.modded.html` next to the original (use *Save as* to pick another name).
 
 The old `~` / `~~` blocks can also be made to replace every match (the **Legacy** checkbox, or a `# Legacy:` line in a mod), see "Legacy phase" below.
-If any block fails, nothing is written. Like KittyPatcher on Windows, the output file uses Windows line endings.
+If any block fails, nothing is written.
+The output is **cleaned the way ScRepacker does it** (the **Clean the output like ScRepacker** checkbox, on by default): the patched HTML is read into its parts and merged back into the game HTML, which gives tidy entities, no stray tags and the same form the Stage builder writes, so it works as the input of a later stage. Switch it off to get the raw patched HTML as the KittyPatcher script alone writes it (with Windows line endings on Windows).
 The three KittyPatcher-style logs (`FailsPatchLog.txt`, `MainPatchLog.txt`, `ModPatchLog.txt`) are written to
 `<game folder>\logs`.
 
@@ -49,9 +50,9 @@ files and folders on the window, and move things with *Up* / *Down*:
 * Dropping a `.html` sets the input, a `.mod` / `.kdiff` / `.patch` file or a folder is added as a Mods item at the end of the list (in front of the last Output instead, if that Output has no mods above it yet), and outputs are added with *Add output HTML* (a save dialog, so an existing file is never picked by accident).
 * The stages run top to bottom. The first stage that fails stops the chain; the outputs written before it stay. Every stage writes its three logs to `<output folder>\logs\<output name>\`.
 * The **Legacy** checkbox applies to every stage. The list is remembered between runs.
-* **Save list** writes the list to a `.json` file and **Load list** replaces the current list with one from a file, so a build can be kept, shared or started again later. The file is the same one `m0onpatcher-cli stages --file` reads (see "Command line"). It stores full paths.
+* **Save list** writes the list to a `.json` file and **Load list** replaces the current list with one from a file, so a build can be kept, shared or started again later. The file is the same one `m0onpatcher-cli stages --file` reads (see "Command line"). Paths inside the folder the file is saved in, or beside it, are stored **relative to it** (with `/`, so it works on any system); a list kept in a pack folder next to `stage1\mods`, `stage2\mods` and the game HTML keeps working when the folder is moved or copied to another computer. Paths elsewhere stay absolute.
 
-Note that the Patcher tab writes the raw patched HTML, like KittyPatcher, not this normalized form.
+The Patcher tab writes the same cleaned form by default (see "Patcher"), so a quick patch of one folder gives the file a one-stage list would.
 
 ### About
 
@@ -266,8 +267,9 @@ m0onpatcher-cli patch <game.html> <mods-folder> [options]
 | `--html <file>`, `--mods <folder>` | The same two things as options, instead of in the first two places (a folder that is given without an option is taken as the mods folder). |
 | `-o`, `--out <file>` | Where to write the result. Default: `<game name>.modded.html` next to the game. |
 | `--legacy-all` | The **Legacy** option: the old `~` / `~~` blocks of mods without a `# Legacy:` header are applied first and replace every match (see "Legacy phase"). |
+| `--raw` | Write the raw patched HTML, as the KittyPatcher script alone writes it, instead of the cleaned form. |
 
-It does what the Patcher tab does: the raw patched HTML, the three logs in `<game folder>/logs`, and no output file when a block fails.
+It does what the Patcher tab does: the cleaned HTML (see "Patcher"), the three logs in `<game folder>/logs`, and no output file when a block fails.
 
 #### `stages`
 
@@ -284,7 +286,7 @@ m0onpatcher-cli stages --input game.html --mods "Bits&Fun.mod" --output stage1.h
 ```
 
 `--file` reads the list from a JSON file instead (the same file the Stage builder's *Save list* writes): an array of items, each one
-`{"Input": "path"}`, `{"Mods": "path"}` or `{"Output": "path"}`. `--legacy-all` applies to every stage.
+`{"Input": "path"}`, `{"Mods": "path"}` or `{"Output": "path"}`. A relative path starts in the folder the list file is in, not in the folder you run the command from. `--legacy-all` applies to every stage.
 
 #### `extract` and `compile`
 

@@ -74,9 +74,12 @@ OPTIONS
     -o, --out <file> Where to write the result (default: <game name>.modded.html next to the game)
     --legacy-all     Legacy option: the old ~ / ~~ blocks of mods without a '# Legacy:' header
                      are applied first and replace every match
+    --raw            Write the raw patched HTML, as the KittyPatcher script alone writes it, instead
+                     of the cleaned form
     -q, --quiet / -v, --verbose
 
-Writes the raw patched HTML (like the Patcher tab) and the three logs (FailsPatchLog.txt,
+Writes the patched HTML in the cleaned form ScRepacker writes (like the Patcher tab; --raw switches
+that off) and the three logs (FailsPatchLog.txt,
 MainPatchLog.txt, ModPatchLog.txt) to <game folder>/logs. If a block fails, no output is written."
         }
         "stages" => {
@@ -94,7 +97,7 @@ OPTIONS
     --input <file>    The game HTML (must come first)
     --mods <path>     A mod file or a folder of mod files (repeatable)
     --output <file>   Ends a stage: where to write its result (repeatable)
-    --file <list.json>  Read the list from a file instead: [{\"Input\":\"game.html\"},{\"Mods\":\"a.mod\"},
+    --file <list.json>  Read the list from a file instead (relative paths start in that file's folder): [{\"Input\":\"game.html\"},{\"Mods\":\"a.mod\"},
                         {\"Output\":\"stage1.html\"},{\"Mods\":\"stage2/mods\"},{\"Output\":\"final.html\"}]
     --legacy-all      Legacy option for every stage (see 'help patch')
     -q, --quiet / -v, --verbose
@@ -321,7 +324,7 @@ where
 fn cmd_patch(args: &[String]) -> CliResult {
     let spec = Spec {
         values: &["--html", "--mods", "--out"],
-        switches: &["--legacy-all", "--help", "--quiet", "--verbose"],
+        switches: &["--legacy-all", "--raw", "--help", "--quiet", "--verbose"],
     };
     let p = parse(args, &spec)?;
     if p.has("--help") {
@@ -354,7 +357,7 @@ fn cmd_patch(args: &[String]) -> CliResult {
             html.with_file_name(format!("{stem}.modded.html"))
         }
     };
-    let job = PatchJob { html, mods, output, legacy_replace_all: p.has("--legacy-all") };
+    let job = PatchJob { html, mods, output, legacy_replace_all: p.has("--legacy-all"), clean_output: !p.has("--raw") };
     run_reporting(p.echo()?, move |r| crate::run_patch(&job, r))
 }
 
@@ -375,7 +378,7 @@ fn cmd_stages(args: &[String]) -> CliResult {
             return usage("use either --file or the --input / --mods / --output options, not both");
         }
         let text = std::fs::read_to_string(file).map_err(|e| CliError::Failed(format!("cannot read {file}: {e}")))?;
-        serde_json::from_str(&text).map_err(|e| CliError::Failed(format!("{file} is not a valid stage list: {e}")))?
+        crate::stages::from_json(&text, std::path::Path::new(file).parent().unwrap_or(std::path::Path::new("."))).map_err(|e| CliError::Failed(format!("{file}: {e}")))?
     } else {
         p.opts
             .iter()

@@ -57,13 +57,15 @@ struct Config {
     show_log: bool,
     /// legacy phase: `~` / `~~` blocks run first and replace every match (see `kitty_engine::load::LoadOptions`)
     legacy_replace_all: bool,
+    /// write the patched HTML in the cleaned form ScRepacker writes (on), or the raw patched HTML (off)
+    clean_output: bool,
     /// the Stage builder list (Modding tools tab)
     pipeline: Vec<stages::Item>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { html: None, mods: None, output: None, show_log: true, legacy_replace_all: false, pipeline: Vec::new() }
+        Self { html: None, mods: None, output: None, show_log: true, legacy_replace_all: false, clean_output: true, pipeline: Vec::new() }
     }
 }
 
@@ -254,6 +256,9 @@ struct PatchJob {
     mods: PathBuf,
     output: PathBuf,
     legacy_replace_all: bool,
+    /// write the cleaned form ScRepacker writes (the patched HTML read into its parts and merged back into the
+    /// game HTML) instead of the raw patched HTML
+    clean_output: bool,
 }
 
 /// Rough position of the engine's progress messages on the bar (the engine only reports stages,
@@ -318,7 +323,13 @@ fn run_patch(job: &PatchJob, r: &Reporter) -> anyhow::Result<String> {
     let outcome = apply_loaded(&html, &loaded, &log_dir, r, 0.0, 1.0)?;
     r.progress(0.96);
 
-    write_html(&job.output, &outcome.html)?;
+    if job.clean_output {
+        r.line("INFO", "Cleaning the output the way ScRepacker does");
+        normalize::write_normalized(&job.html, &outcome.html, &job.output)
+            .with_context(|| format!("write {}", job.output.display()))?;
+    } else {
+        write_html(&job.output, &outcome.html)?;
+    }
     Ok(format!(
         "Done: {} mod file(s), {} replacements made in {:.1} s. Wrote {}",
         loaded.loaded_mods.len(),
@@ -622,7 +633,7 @@ impl App {
             return;
         };
         self.auto_scroll = true;
-        let job = PatchJob { html, mods, output, legacy_replace_all: self.cfg.legacy_replace_all };
+        let job = PatchJob { html, mods, output, legacy_replace_all: self.cfg.legacy_replace_all, clean_output: self.cfg.clean_output };
         spawn_task(self.shared.clone(), ctx.clone(), "Patching", false, move |r| run_patch(&job, r));
     }
 
@@ -713,6 +724,7 @@ impl App {
         }
 
         self.render_legacy_checkbox(ui);
+        self.render_clean_checkbox(ui);
 
         ui.add_space(4.0);
         ui.horizontal(|ui| {
@@ -732,6 +744,21 @@ impl App {
             }
             self.render_log_toggle_and_status(ui);
         });
+    }
+
+    /// The "clean output" checkbox of the Patcher tab.
+    fn render_clean_checkbox(&mut self, ui: &mut egui::Ui) {
+        let running = self.is_running();
+        let mut clean = self.cfg.clean_output;
+        let clean_box = ui
+            .add_enabled(!running, egui::Checkbox::new(&mut clean, "Clean the output like ScRepacker (recommended)"))
+            .on_hover_text(
+                "On: after patching, the HTML is read into its parts (styles, scripts, passages) and merged back into the game HTML, which is the form ScRepacker writes and the Stage builder writes: tidy entities, no stray tags, the same passage order. Off: the raw patched HTML, as the KittyPatcher script alone writes it. Mods written against ScRepacker's output (a stage 2 pack) expect the clean form.",
+            );
+        if clean_box.changed() {
+            self.cfg.clean_output = clean;
+            save_config(&self.cfg);
+        }
     }
 
     /// The Legacy checkbox (shared by the Patcher tab and the Stage builder).
@@ -824,7 +851,7 @@ impl App {
                 }
             }
             if let Some(path) = dlg.save_file() {
-                self.list_note = Some(match std::fs::write(&path, stages::to_json(&self.cfg.pipeline)) {
+                self.list_note = Some(match std::fs::write(&path, stages::to_json(&self.cfg.pipeline, path.parent().unwrap_or(Path::new(".")))) {
                     Ok(()) => (format!("Saved the list to {}", path.display()), false),
                     Err(e) => (format!("Cannot save {}: {e}", path.display()), true),
                 });
@@ -832,7 +859,7 @@ impl App {
         }
         if load_list {
             if let Some(path) = rfd::FileDialog::new().add_filter("Stage list", &["json"]).pick_file() {
-                self.list_note = Some(match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| stages::from_json(&t)) {
+                self.list_note = Some(match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| stages::from_json(&t, path.parent().unwrap_or(Path::new(".")))) {
                     Ok(items) => {
                         self.cfg.pipeline = items;
                         save_config(&self.cfg);
@@ -1384,7 +1411,7 @@ mod patcher_tests {
         );
         std::fs::write(dir.join("g.html"), html).unwrap();
         std::fs::write(dir.join("mods").join("a.mod"), "Replace:\ncat sat\nWith:\ndog sat\n").unwrap();
-        let job = PatchJob { html: dir.join("g.html"), mods: dir.join("mods"), output: dir.join("g.modded.html"), legacy_replace_all: false };
+        let job = PatchJob { html: dir.join("g.html"), mods: dir.join("mods"), output: dir.join("g.modded.html"), legacy_replace_all: false, clean_output: false };
         let (r, shared) = reporter();
         let msg = run_patch(&job, &r).unwrap_or_else(|e| panic!("{e:#}\n{:?}", shared.lock().unwrap().log));
         assert!(msg.contains("1 mod file(s)"), "{msg}");
@@ -1399,7 +1426,7 @@ mod patcher_tests {
     #[ignore]
     fn real_patcher_tab_job() {
         let get = |k: &str| PathBuf::from(std::env::var(k).unwrap_or_else(|_| panic!("set {k}")));
-        let job = PatchJob { html: get("M0ON_REAL_HTML"), mods: get("M0ON_REAL_MODS1"), output: get("M0ON_REAL_OUT"), legacy_replace_all: false };
+        let job = PatchJob { html: get("M0ON_REAL_HTML"), mods: get("M0ON_REAL_MODS1"), output: get("M0ON_REAL_OUT"), legacy_replace_all: false, clean_output: false };
         let (r, _shared) = reporter();
         println!("{}", run_patch(&job, &r).unwrap());
     }

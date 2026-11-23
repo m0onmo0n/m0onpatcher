@@ -1,6 +1,6 @@
 [package]
 name = "m0onpatcher"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Standalone mod patcher for Course of Temptation (SugarCube / Twine): applies .mod files to a game HTML with the built-in Rust engine."
 

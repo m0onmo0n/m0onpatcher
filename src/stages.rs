@@ -12,7 +12,7 @@
 //! (a folder inside itself by `# Priority:` and name) and can see each other's changes. An Output closes the run,
 //! is written to disk, and its result is patched further in memory by the items below it.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{Context, anyhow, bail};
@@ -31,6 +31,15 @@ pub enum Item {
 }
 
 impl Item {
+    /// The same item with `f` applied to its path.
+    fn map_path(&self, f: impl Fn(&Path) -> PathBuf) -> Item {
+        match self {
+            Item::Input(p) => Item::Input(f(p)),
+            Item::Mods(p) => Item::Mods(f(p)),
+            Item::Output(p) => Item::Output(f(p)),
+        }
+    }
+
     pub fn path(&self) -> &Path {
         match self {
             Item::Input(p) | Item::Mods(p) | Item::Output(p) => p,
@@ -51,14 +60,88 @@ pub struct Plan {
     pub stages: Vec<Stage>,
 }
 
-/// The list as the text of a list file (the same format `m0onpatcher-cli stages --file` reads).
-pub fn to_json(items: &[Item]) -> String {
-    serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_string())
+/// The list as the text of a list file (the format `m0onpatcher-cli stages --file` reads). `list_dir` is the folder the
+/// file is saved in: paths inside it, or in a sibling folder of it, are stored relative to it and with `/` as the
+/// separator, so a list kept next to its files works on any computer and any system. Other paths stay absolute.
+pub fn to_json(items: &[Item], list_dir: &Path) -> String {
+    let stored: Vec<Item> = items.iter().map(|it| it.map_path(|p| store_path(p, list_dir))).collect();
+    serde_json::to_string_pretty(&stored).unwrap_or_else(|_| "[]".to_string())
 }
 
-/// Read a list file written by `to_json` (or by hand, see `m0onpatcher-cli help stages`).
-pub fn from_json(text: &str) -> Result<Vec<Item>, String> {
-    serde_json::from_str(text).map_err(|e| format!("this is not a stage list: {e}"))
+/// Read a list file (written by `to_json`, or by hand, see `m0onpatcher-cli help stages`). Relative paths are taken
+/// from `list_dir`, the folder the file is in, not from the folder the program was started in.
+pub fn from_json(text: &str, list_dir: &Path) -> Result<Vec<Item>, String> {
+    let items: Vec<Item> = serde_json::from_str(text).map_err(|e| format!("this is not a stage list: {e}"))?;
+    Ok(items.iter().map(|it| it.map_path(|p| resolve_path(p, list_dir))).collect())
+}
+
+/// `path` as it is written into a list file kept in `dir`.
+fn store_path(path: &Path, dir: &Path) -> PathBuf {
+    match relative_to(path, dir) {
+        Some(rel) => PathBuf::from(rel.to_string_lossy().replace('\\', "/")),
+        None => path.to_path_buf(),
+    }
+}
+
+/// A path read from a list file kept in `dir`: absolute paths stay, relative ones start at `dir`.
+fn resolve_path(path: &Path, dir: &Path) -> PathBuf {
+    let text = path.to_string_lossy();
+    let b = text.as_bytes();
+    // a Windows path (drive letter, or a share) stays as it is when the list is read on another system
+    let windows_like = (b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':') || text.starts_with("\\\\");
+    if path.is_absolute() || path.has_root() || windows_like {
+        lexical(path)
+    } else {
+        lexical(&dir.join(path))
+    }
+}
+
+/// `..` and `.` folded away without touching the disk.
+fn lexical(path: &Path) -> PathBuf {
+    let mut out: Vec<Component> = Vec::new();
+    for c in path.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => match out.last() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir) | Some(Component::Prefix(_)) => {}
+                _ => out.push(c),
+            },
+            _ => out.push(c),
+        }
+    }
+    out.iter().map(|c| c.as_os_str()).collect()
+}
+
+/// `path` relative to the folder `base`, when both are absolute and share at least one real folder name
+/// (a path on another drive, or only the root in common, has no useful relative form).
+fn relative_to(path: &Path, base: &Path) -> Option<PathBuf> {
+    if !path.is_absolute() || !base.is_absolute() {
+        return None;
+    }
+    let (p, b) = (lexical(path), lexical(base));
+    let p: Vec<Component> = p.components().collect();
+    let b: Vec<Component> = b.components().collect();
+    let mut common = 0;
+    while common < p.len() && common < b.len() && p[common] == b[common] {
+        common += 1;
+    }
+    if !p[..common].iter().any(|c| matches!(c, Component::Normal(_))) {
+        return None;
+    }
+    let mut out = PathBuf::new();
+    for _ in common..b.len() {
+        out.push("..");
+    }
+    for c in &p[common..] {
+        out.push(c.as_os_str());
+    }
+    if out.as_os_str().is_empty() {
+        out.push(".");
+    }
+    Some(out)
 }
 
 /// Add mods (files or folders) to the list. They go at the end, except when the list ends with an Output that has
@@ -246,14 +329,37 @@ mod tests {
     }
 
     #[test]
-    fn list_files_round_trip() {
-        let v = vec![Item::Input(p("in.html")), Item::Mods(p("a.mod")), Item::Output(p("s1.html")), Item::Mods(p("mods2")), Item::Output(p("s2.html"))];
-        assert_eq!(from_json(&to_json(&v)).unwrap(), v);
-        // the by-hand format of the command line help
+    fn list_files_round_trip_with_relative_paths() {
+        // paths below or beside the folder of the list file are stored relative to it, with / as the separator
+        let root = std::env::temp_dir().join("m0on-list-test");
+        let dir = root.join("pack");
+        let v = vec![
+            Item::Input(root.join("vanilla").join("game.html")),
+            Item::Mods(dir.join("stage1").join("mods")),
+            Item::Output(dir.join("stage1.html")),
+            Item::Mods(dir.join("stage2").join("a.mod")),
+            Item::Output(dir.join("final.html")),
+        ];
+        let text = to_json(&v, &dir);
+        assert!(text.contains("\"../vanilla/game.html\""), "{text}");
+        assert!(text.contains("\"stage1/mods\""), "{text}");
+        assert!(text.contains("\"stage1.html\""), "{text}");
+        assert!(!text.contains(root.to_string_lossy().replace('\\', "/").as_str()), "{text}");
+        // read back from the same folder: the same list
+        assert_eq!(from_json(&text, &dir).unwrap(), v);
+        // the whole pack moved: the list follows it
+        let moved = std::env::temp_dir().join("m0on-list-moved").join("pack");
+        let back = from_json(&text, &moved).unwrap();
+        assert_eq!(back[1], Item::Mods(moved.join("stage1").join("mods")));
+        assert_eq!(back[0], Item::Input(moved.parent().unwrap().join("vanilla").join("game.html")));
+        // the by-hand format of the command line help (relative to the list file) and a Windows path read anywhere
         let by_hand = r#"[{"Input":"game.html"},{"Mods":"a.mod"},{"Output":"stage1.html"}]"#;
-        assert_eq!(from_json(by_hand).unwrap().len(), 3);
-        assert!(from_json("{}").unwrap_err().contains("not a stage list"));
-        assert!(from_json("").is_err());
+        let items = from_json(by_hand, &dir).unwrap();
+        assert_eq!(items[0], Item::Input(dir.join("game.html")));
+        let win = from_json(r#"[{"Input":"E:/x/game.html"}]"#, &dir).unwrap();
+        assert_eq!(win[0], Item::Input(PathBuf::from("E:/x/game.html")));
+        assert!(from_json("{}", &dir).unwrap_err().contains("not a stage list"));
+        assert!(from_json("", &dir).is_err());
     }
 
     #[test]
